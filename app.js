@@ -1,6 +1,8 @@
 const STORAGE_KEY = 'yueyue-tasks-v2';
 const SYNC_CODE_KEY = 'yueyue-sync-code';
 const SYNC_REMOTE_KEY = 'yueyue-last-remote';
+const NCM_UID_KEY = 'yueyue-ncm-uid';
+const NCM_CACHE_KEY = 'yueyue-ncm-cache';
 
 // ===== 云端同步配置（Supabase 免费版）=====
 // 把下面两个值替换成你在 supabase.com 项目里拿到的
@@ -378,6 +380,7 @@ class TaskApp {
     this.receipts = data.receipts || [];
     this.syncCode = localStorage.getItem(SYNC_CODE_KEY) || '';
     this.lastRemoteUpdatedAt = localStorage.getItem(SYNC_REMOTE_KEY) || '';
+    this.ncmUid = localStorage.getItem(NCM_UID_KEY) || '';
     this._supabase = null;
     this._pushTimer = null;
     this._syncTimer = null;
@@ -1149,10 +1152,129 @@ class TaskApp {
     document.getElementById('receipt-rate').textContent = rate + '%';
     document.getElementById('receipt-barcode').innerHTML = this.barcodeSvg(date);
     document.getElementById('receipt-modal').style.display = 'flex';
+    // 异步加载「今日歌曲」像素封面（不阻塞小票弹出）
+    this.renderReceiptMusic(date);
   }
 
   closeReceipt() {
     document.getElementById('receipt-modal').style.display = 'none';
+  }
+
+  // ===== 网易云「今日歌曲」 =====
+  openNcmModal() {
+    const input = document.getElementById('ncm-uid');
+    if (input) input.value = this.ncmUid || '';
+    const clearBtn = document.getElementById('ncm-clear');
+    if (clearBtn) clearBtn.style.display = this.ncmUid ? 'inline-block' : 'none';
+    const status = document.getElementById('ncm-status');
+    if (status) status.textContent = '';
+    const modal = document.getElementById('ncm-modal');
+    if (modal) modal.style.display = 'flex';
+  }
+
+  closeNcmModal() {
+    const el = document.getElementById('ncm-modal');
+    if (el) el.style.display = 'none';
+  }
+
+  saveNcmUid() {
+    const input = document.getElementById('ncm-uid');
+    const v = (input && input.value || '').trim().replace(/[^0-9]/g, '');
+    this.ncmUid = v;
+    if (v) localStorage.setItem(NCM_UID_KEY, v);
+    else localStorage.removeItem(NCM_UID_KEY);
+    localStorage.removeItem(NCM_CACHE_KEY); // 换 UID 清空缓存
+    const clearBtn = document.getElementById('ncm-clear');
+    if (clearBtn) clearBtn.style.display = v ? 'inline-block' : 'none';
+    const status = document.getElementById('ncm-status');
+    if (status) status.textContent = v ? '已保存 🎵 去「今日小票」看看效果～' : '已清空';
+  }
+
+  clearNcm() {
+    this.ncmUid = '';
+    localStorage.removeItem(NCM_UID_KEY);
+    localStorage.removeItem(NCM_CACHE_KEY);
+    const input = document.getElementById('ncm-uid');
+    if (input) input.value = '';
+    this.closeNcmModal();
+  }
+
+  buildProxiedCoverUrl(coverUrl) {
+    return `/.netlify/functions/ncm-cover?url=${encodeURIComponent(coverUrl)}`;
+  }
+
+  async getSongOfDay() {
+    if (!this.ncmUid) return null;
+    const today = this.todayStr();
+    let cache = null;
+    try { cache = JSON.parse(localStorage.getItem(NCM_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
+    if (cache && cache.date === today && cache.uid === this.ncmUid && cache.song) {
+      return cache.song;
+    }
+    try {
+      const resp = await fetch(`/.netlify/functions/ncm?uid=${encodeURIComponent(this.ncmUid)}`);
+      const data = await resp.json();
+      if (!data.ok || !data.list || !data.list.length) {
+        const status = document.getElementById('ncm-status');
+        if (status && document.getElementById('ncm-modal').style.display === 'flex') {
+          status.textContent = '读取失败：' + (data.error || '未知错误');
+        }
+        return null;
+      }
+      const seed = hashString(this.ncmUid + '|' + today);
+      const song = data.list[seed % data.list.length];
+      const result = { name: song.name, artist: song.artist, coverUrl: song.coverUrl };
+      try { localStorage.setItem(NCM_CACHE_KEY, JSON.stringify({ date: today, uid: this.ncmUid, song: result })); } catch (e) {}
+      return result;
+    } catch (e) {
+      console.warn('ncm fetch failed', e);
+      return null;
+    }
+  }
+
+  pixelateCover(proxiedUrl, size = 30) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const small = document.createElement('canvas');
+          small.width = size; small.height = size;
+          const sctx = small.getContext('2d');
+          sctx.imageSmoothingEnabled = false;
+          sctx.drawImage(img, 0, 0, size, size);
+          const out = document.createElement('canvas');
+          const scale = 4;
+          out.width = size * scale; out.height = size * scale;
+          const octx = out.getContext('2d');
+          octx.imageSmoothingEnabled = false;
+          octx.drawImage(small, 0, 0, out.width, out.height);
+          resolve(out.toDataURL('image/png'));
+        } catch (e) { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = proxiedUrl;
+    });
+  }
+
+  async renderReceiptMusic(date) {
+    const el = document.getElementById('receipt-music');
+    if (!el) return;
+    if (!this.ncmUid) { el.style.display = 'none'; return; }
+    const song = await this.getSongOfDay();
+    if (!song) { el.style.display = 'none'; return; }
+    const proxied = this.buildProxiedCoverUrl(song.coverUrl);
+    const pixel = await this.pixelateCover(proxied, 30);
+    el.style.display = 'block';
+    el.innerHTML = `
+      <div class="receipt-music-label">🎵 今日歌曲 / TODAY'S TRACK</div>
+      <div class="receipt-music-body">
+        <div class="receipt-music-cover">${pixel ? `<img src="${pixel}" alt="cover" />` : ''}</div>
+        <div class="receipt-music-meta">
+          <div class="receipt-music-name">${this.escapeHtml(song.name)}</div>
+          <div class="receipt-music-artist">${this.escapeHtml(song.artist)}</div>
+        </div>
+      </div>`;
   }
 
   closeTopModal() {
@@ -1165,7 +1287,8 @@ class TaskApp {
       'routine-modal': () => this.closeRoutineModal(),
       'subtask-modal': () => this.closeSubtaskModal(),
       'task-modal': () => this.closeTaskModal(),
-      'sync-modal': () => this.closeSyncModal()
+      'sync-modal': () => this.closeSyncModal(),
+      'ncm-modal': () => this.closeNcmModal()
     };
     for (const id of Object.keys(map)) {
       const el = document.getElementById(id);

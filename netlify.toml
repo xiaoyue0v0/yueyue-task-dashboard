@@ -1,0 +1,11 @@
+[build]
+  # 仓库根目录即为网站根（index.html 在根）
+  publish = "."
+  # 无服务器函数目录，用于网易云代理
+  functions = "netlify/functions"
+
+# 纯静态资源缓存
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Robots-Tag = "noindex"

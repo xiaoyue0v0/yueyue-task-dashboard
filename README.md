@@ -1,6 +1,6 @@
 # 悦悦任务统筹台 · Yueyue Task Dashboard
 
-一个**纯前端**（HTML/CSS/JS，无后端）的个人任务统筹台，为悦悦设计，用来把回国后密集的待办清单变成可执行、可追踪、不会漏的日程体系。
+一个**本地优先**的个人任务统筹台（HTML/CSS/JS），为悦悦设计，用来把回国后密集的待办清单变成可执行、可追踪、不会漏的日程体系。网易云「今日歌曲」功能叠加一个可选的 Netlify 无服务器函数做代理，其余完全离线可用。
 
 灵感来自抖音「每日小票生成器」——把每天完成的正反馈收集 + 打印成一张复古热敏小票，哄自己每天起床上班 💤
 
@@ -18,6 +18,11 @@
   - 每天根据日期随机生成一幅 **像素风 dither 图**（Canvas + Bayer 抖动，8 种图案）
   - 「从打印机滚出来」开票动效 + 逐行打印 + 撕边
   - 汇总当天完成数据：每日必做 / 今日限定 / 子任务 / 护肤 / 拉粑粑 / 完成率
+- **网易云「今日歌曲」（TODAY'S TRACK）**
+  - 点顶部 🎵 填入你的**网易云 UID**（个人主页地址栏 `user?id=123456` 里的数字）
+  - 每天从小票里随机抽一首你「喜欢的音乐」，封面转成**像素风**印在小票上
+  - 按日期固定（同一天同一首，过零点换下一首），数据走你自己的无服务器函数，UID 只存本地
+  - 需要把仓库以 **Git 方式连到 Netlify**（见下方「部署」），因为网易云接口有加密 + 跨域限制，纯拖拽部署跑不了函数
 - **本地优先 + 可选云端同步**
   - 默认只存浏览器 `localStorage`，离线可用
   - 可选接入 Supabase 做多设备同步（详见 `SUPABASE_SETUP.md`）
@@ -29,6 +34,7 @@
 
 - 纯静态三件套：`index.html` + `style.css` + `app.js`
 - `supabase.umd.js`：Supabase JS v2（仅用于可选的云端同步，不引入也能跑）
+- `netlify/functions/ncm.js` + `ncm-cover.js`：网易云代理（weapi 抓取「我喜欢的音乐」+ 封面图 CORS 代理），**仅网易云功能需要**，且只在连了 Git 的 Netlify 上运行
 - **无构建步骤**，打开即用
 
 ---
@@ -51,6 +57,17 @@ python3 -m http.server 8000
 更详细步骤见 `DEPLOY.md`。
 
 > 例：Netlify 拖拽部署 → 选 `task-dashboard` 文件夹 → Deploy。
+
+### ⚠️ 网易云「今日歌曲」必须走 Git 部署
+
+网易云接口有加密（weapi）+ 浏览器跨域限制，纯前端抓不了，所以该功能依赖仓库里的 `netlify/functions/` 无服务器函数。**Netlify 拖拽部署（Drop）不支持函数**，必须改成把 GitHub 仓库连到 Netlify：
+
+1. 打开 https://app.netlify.com → **Add new site → Import an existing project → GitHub**
+2. 选 `xiaoyue0v0/yueyue-task-dashboard`
+3. Build command 留空，Publish directory 填 `.`（仓库根 `netlify.toml` 已配好 `functions` 目录）
+4. Deploy 后，🎵 填 UID 即可生效
+
+> 不连 Git、只用 Drop 部署时，其余功能一切正常，「今日歌曲」区块会自动隐藏（无 UID / 无函数时不显示）。
 
 ---
 
@@ -84,6 +101,9 @@ python3 -m http.server 8000
 | `supabase.umd.js` | Supabase 客户端（可选同步） |
 | `DEPLOY.md` | 部署说明 |
 | `SUPABASE_SETUP.md` | 云端同步建表与配置说明 |
+| `netlify.toml` | Netlify 配置（发布目录 + 函数目录） |
+| `netlify/functions/ncm.js` | 网易云「我喜欢的音乐」代理（weapi） |
+| `netlify/functions/ncm-cover.js` | 网易云封面图 CORS 代理（供 Canvas 像素化） |
 | `preview-*.png` | 各功能界面历史预览截图 |
 
 ---
@@ -92,6 +112,7 @@ python3 -m http.server 8000
 
 - 数据默认只存你本地浏览器（`localStorage`），不经过任何第三方。
 - 开启云端同步后，数据会经过**你自己的** Supabase 项目，密钥由你掌控。
+- 网易云 **UID 只存在你本地浏览器**（`yueyue-ncm-uid`），不会进仓库；「今日歌曲」通过**你自己的** Netlify 函数去抓网易云公开数据，不依赖任何第三方中转到账。
 - 不要把含真实任务数据的导出文件（`*.export.json`）提交进仓库。
 
 ---

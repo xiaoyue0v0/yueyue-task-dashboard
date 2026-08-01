@@ -31,6 +31,7 @@
           <span id="sync-icon">☁️</span>
           <span id="sync-label">未同步</span>
         </button>
+        <button class="btn btn-secondary" id="ncm-btn" onclick="app.openNcmModal()" title="网易云音乐">🎵</button>
         <button class="btn btn-primary" onclick="app.openTaskModal()">+ 新增任务</button>
       </div>
     </header>
@@ -513,6 +514,28 @@
     </div>
   </div>
 
+  <div class="modal-overlay" id="ncm-modal" style="display: none;">
+    <div class="modal modal-small">
+      <div class="modal-header">
+        <h2>🎵 网易云音乐</h2>
+        <button class="modal-close" onclick="app.closeNcmModal()">×</button>
+      </div>
+      <div class="modal-body">
+        <p class="sync-desc">填入你的网易云 <strong>用户 ID</strong>，小票每天会随机抽一首你「喜欢的音乐」印上去（封面转像素风）。<br>获取方式：打开网易云网页版个人主页，地址栏里 <code>user?id=123456</code> 的数字就是 UID。</p>
+        <div class="form-group">
+          <label>网易云 UID</label>
+          <input type="text" id="ncm-uid" placeholder="例如：32953014" autocomplete="off" inputmode="numeric" />
+        </div>
+        <div id="ncm-status" class="sync-status"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" onclick="app.clearNcm()" id="ncm-clear" style="display:none;">清除</button>
+          <button type="button" class="btn btn-secondary" onclick="app.closeNcmModal()">关闭</button>
+          <button type="button" class="btn btn-primary" onclick="app.saveNcmUid()">保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="skincare-day-modal" style="display: none;">
     <div class="modal skincare-day-modal">
       <div class="modal-header">
@@ -555,6 +578,8 @@
 
         <div class="receipt-divider"></div>
 
+        <div class="receipt-music" id="receipt-music" style="display:none;"></div>
+
         <div class="receipt-data" id="receipt-body"></div>
 
         <div class="receipt-divider"></div>
@@ -574,6 +599,6 @@
   </div>
 
   <script src="supabase.umd.js"></script>
-  <script src="app.js?v=16"></script>
+  <script src="app.js?v=17"></script>
 </body>
 </html>
