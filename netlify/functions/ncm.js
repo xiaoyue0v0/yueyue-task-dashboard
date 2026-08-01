@@ -6,9 +6,10 @@
 //   GET /.netlify/functions/ncm?uid=XXXX
 // 返回：{ ok, playlistId, count, list:[{id,name,artist,coverUrl}] }
 //
-// 后端地址可配：在 Netlify 控制台设置环境变量 NCM_API_BASE 即可换成你自己部署的实例。
-// 默认用 CloudMusicAnalyst 项目同款公开备份实例。
-const NCM_API_BASE = (process.env.NCM_API_BASE || 'https://netease-cloud-music-api-backup-94lcuvn5c.vercel.app').replace(/\/$/, '');
+// 后端地址可配：在 Netlify 控制台设置环境变量 NCM_API_BASE 指向你自己部署的 NeteaseCloudMusicApi。
+// 不再默认使用任何公开第三方实例（它们经常失效/限流）。
+const NCM_API_BASE = (process.env.NCM_API_BASE || '').replace(/\/$/, '');
+const NCM_REALIP = (process.env.NCM_REALIP || '116.25.146.177').trim();
 
 const CORS = {
   'Access-Control-Allow-Origin': '*',
@@ -19,7 +20,8 @@ const CORS = {
 const cache = new Map();
 
 async function ncmGet(path, query) {
-  const url = `${NCM_API_BASE}${path}?${query}`;
+  const sep = query ? '&' : '';
+  const url = `${NCM_API_BASE}${path}?${query}${sep}realIP=${encodeURIComponent(NCM_REALIP)}`;
   const resp = await fetch(url, {
     method: 'GET',
     headers: {
@@ -57,6 +59,10 @@ function normalizeSong(song) {
 }
 
 exports.handler = async (event) => {
+  if (!NCM_API_BASE) {
+    return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: '未配置 NCM_API_BASE', hint: '请在 Netlify 控制台 Site settings → Environment variables 添加 NCM_API_BASE，指向你自己部署的 NeteaseCloudMusicApi 地址（例如 https://xxx.vercel.app）' }) };
+  }
+
   const qs = event.queryStringParameters || {};
   const uid = qs.uid;
   if (!uid) {
