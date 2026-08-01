@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+KuaiLe&display=swap');
+
 :root {
   --bg: #f5f7fa;
   --card: #ffffff;
@@ -12,6 +14,9 @@
   --shadow: 0 1px 3px rgba(0,0,0,0.1), 0 1px 2px rgba(0,0,0,0.06);
   --shadow-lg: 0 10px 25px rgba(0,0,0,0.1);
   --radius: 12px;
+
+  /* 像素风字体栈（小票专用） */
+  --font-pixel: "Press Start 2P", "ZCOOL KuaiLe", "Courier New", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace;
 }
 
 * {
@@ -2250,11 +2255,14 @@ input::placeholder, textarea::placeholder {
   padding: 28px 24px 24px;
   margin-top: -10px;
   border-radius: 0 0 4px 4px;
-  font-family: "Courier New", "SF Mono", "PingFang SC", "Microsoft YaHei", monospace;
+  font-family: var(--font-pixel);
   box-shadow: 0 18px 46px rgba(0,0,0,0.32);
   position: relative;
   transform-origin: top center;
   animation: receiptPrint 880ms cubic-bezier(.2,.85,.25,1) both;
+  -webkit-font-smoothing: none;
+  -moz-osx-font-smoothing: grayscale;
+  font-smooth: never;
 }
 .receipt-paper::before {
   content: "";
@@ -2293,38 +2301,44 @@ input::placeholder, textarea::placeholder {
   border-radius: 50%;
   background: rgba(0,0,0,0.05);
   color: #3a3630;
-  font-size: 20px;
+  font-size: 14px;
   line-height: 1;
   cursor: pointer;
   z-index: 2;
+  font-family: var(--font-pixel);
+  padding-bottom: 2px;
 }
 .receipt-close:hover { background: rgba(0,0,0,0.11); }
 
 .receipt-brand {
   text-align: center;
-  font-size: 11px;
-  font-weight: 700;
+  font-size: 10px;
+  font-weight: 400;
   letter-spacing: 3px;
   color: #6b6558;
   margin-top: 4px;
+  font-family: var(--font-pixel);
+  text-transform: uppercase;
 }
 
 .receipt-date-label {
   text-align: center;
-  font-size: 18px;
-  font-weight: 700;
+  font-size: 14px;
+  font-weight: 400;
   letter-spacing: 0.5px;
   color: #2b2823;
   margin: 6px 0 4px;
-  font-family: "Courier New", "SF Mono", monospace;
+  font-family: var(--font-pixel);
 }
 
 .receipt-meta-line {
   text-align: center;
-  font-size: 9px;
-  letter-spacing: 1px;
+  font-size: 8px;
+  letter-spacing: 0.5px;
+  line-height: 1.8;
   color: #8f8776;
   margin-bottom: 14px;
+  font-family: var(--font-pixel);
 }
 .receipt-meta-line span { margin: 0 3px; }
 
@@ -2333,14 +2347,15 @@ input::placeholder, textarea::placeholder {
   background: #1f1d1a;
   color: #f7f4ec;
   width: 130px;
-  padding: 12px 0;
+  padding: 14px 0 12px;
   border-radius: 14px;
   text-align: center;
-  font-size: 34px;
-  font-weight: 800;
-  letter-spacing: 2px;
-  font-family: "Courier New", "SF Mono", monospace;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: 1px;
+  font-family: var(--font-pixel);
   box-shadow: 0 5px 0 rgba(0,0,0,0.12);
+  line-height: 1.2;
 }
 
 .receipt-divider {
@@ -2375,9 +2390,10 @@ input::placeholder, textarea::placeholder {
 }
 
 .receipt-hero-label {
-  font-size: 9px;
+  font-size: 8px;
   color: #8f8776;
   letter-spacing: 2px;
+  font-family: var(--font-pixel);
 }
 
 .receipt-data { min-height: 60px; }
@@ -2386,10 +2402,11 @@ input::placeholder, textarea::placeholder {
   display: flex;
   align-items: baseline;
   gap: 8px;
-  padding: 7px 0;
-  font-size: 13px;
+  padding: 9px 0;
+  font-size: 11px;
   opacity: 0;
   animation: itemIn 420ms ease-out both;
+  font-family: var(--font-pixel);
 }
 @keyframes itemIn {
   from { opacity: 0; transform: translateY(6px); }
@@ -2397,13 +2414,14 @@ input::placeholder, textarea::placeholder {
 }
 
 .receipt-row-label {
-  font-weight: 700;
+  font-weight: 400;
   flex-shrink: 0;
   max-width: 140px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   color: #2b2823;
+  line-height: 1.4;
 }
 
 .receipt-row-dots {
@@ -2415,31 +2433,35 @@ input::placeholder, textarea::placeholder {
 }
 
 .receipt-row-value {
-  font-weight: 800;
+  font-weight: 400;
   color: #1f1d1a;
   white-space: nowrap;
   flex-shrink: 0;
-  font-size: 13px;
-  font-family: "Courier New", "SF Mono", monospace;
+  font-size: 11px;
+  font-family: var(--font-pixel);
+  line-height: 1.4;
 }
 
 .receipt-empty {
   text-align: center;
-  font-size: 13px;
+  font-size: 11px;
   color: #8f8776;
   padding: 22px 0;
   line-height: 1.8;
+  font-family: var(--font-pixel);
 }
 
 .receipt-summary {
-  font-size: 12px;
+  font-size: 10px;
+  font-family: var(--font-pixel);
 }
 
 .receipt-summary .receipt-row {
   display: flex;
   justify-content: space-between;
-  padding: 4px 0;
+  padding: 5px 0;
   color: #5c564a;
+  line-height: 1.4;
 }
 
 .receipt-barcode {
@@ -2454,17 +2476,19 @@ input::placeholder, textarea::placeholder {
 
 .receipt-thanks {
   text-align: center;
-  font-size: 12px;
-  line-height: 1.7;
+  font-size: 9px;
+  line-height: 1.8;
   color: #6b6558;
+  font-family: var(--font-pixel);
 }
 
 .receipt-foot {
   text-align: center;
-  font-size: 9px;
+  font-size: 7px;
   color: #a8a08c;
   margin-top: 10px;
-  letter-spacing: 1px;
+  letter-spacing: 0.5px;
+  font-family: var(--font-pixel);
 }
 
 /* 小票收藏夹 / 托盘 */
@@ -2478,14 +2502,16 @@ input::placeholder, textarea::placeholder {
   margin-bottom: 22px;
 }
 .receipt-view-title {
-  font-size: 22px;
-  font-weight: 800;
+  font-size: 18px;
+  font-weight: 400;
   color: var(--text-primary);
-  margin-bottom: 6px;
+  margin-bottom: 8px;
+  font-family: var(--font-pixel);
 }
 .receipt-view-sub {
-  font-size: 13px;
+  font-size: 11px;
   color: var(--text-secondary);
+  font-family: var(--font-pixel);
 }
 
 .receipt-tray {
@@ -2538,9 +2564,9 @@ input::placeholder, textarea::placeholder {
   cursor: grabbing;
 }
 .receipt-card-date {
-  font-family: "Courier New", "SF Mono", monospace;
-  font-size: 16px;
-  font-weight: 800;
+  font-family: var(--font-pixel);
+  font-size: 12px;
+  font-weight: 400;
   color: #2b2823;
   margin-bottom: 8px;
 }
@@ -2555,17 +2581,19 @@ input::placeholder, textarea::placeholder {
   background: #fff;
 }
 .receipt-card-pattern {
-  font-size: 9px;
-  letter-spacing: 1px;
+  font-size: 7px;
+  letter-spacing: 0.5px;
   color: #8f8776;
   text-transform: uppercase;
+  font-family: var(--font-pixel);
 }
 
 .receipt-tray-empty {
   text-align: center;
   color: var(--text-secondary);
-  font-size: 14px;
+  font-size: 11px;
   padding: 40px 20px;
+  font-family: var(--font-pixel);
 }
 
 /* Cloud Sync */

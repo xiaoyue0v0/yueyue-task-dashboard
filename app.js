@@ -90,14 +90,228 @@ const SKINCARE_CATEGORIES = [
   { key: 'salon', label: '去美容店', emoji: '💇' }
 ];
 
-// ===== 像素风 dither 图片生成器（复古热敏打印感）=====
+// ===== 像素风图片生成器（手工 24x24 位图，干净 1-bit）=====
 const PIXEL_PATTERNS = ['plant', 'hourglass', 'star', 'moon', 'cat', 'coffee', 'cloud', 'flower'];
-const BAYER_4X4 = [
-  [ 0,  8,  2, 10],
-  [12,  4, 14,  6],
-  [ 3, 11,  1,  9],
-  [15,  7, 13,  5]
-];
+
+// 每个图案是 24x24 的位图：' ' = 透明/白，'#' = 黑
+const PIXEL_BITMAPS = {
+  // 盆栽
+  plant: [
+    '                        ',
+    '           ##           ',
+    '          ####          ',
+    '          ####          ',
+    '         ######         ',
+    '         ######         ',
+    '        ###  ###        ',
+    '        ###  ###        ',
+    '        ###  ###        ',
+    '        ###  ###        ',
+    '       ####  ####       ',
+    '       ####  ####       ',
+    '       ####  ####       ',
+    '        ###  ###        ',
+    '        ###  ###        ',
+    '        ###  ###        ',
+    '        ###  ###        ',
+    '       ##########       ',
+    '      ############      ',
+    '     ##############     ',
+    '     ##############     ',
+    '     ##############     ',
+    '     ##############     ',
+    '                        '
+  ],
+  // 沙漏
+  hourglass: [
+    '                        ',
+    '    ##############      ',
+    '    ##############      ',
+    '     ############       ',
+    '      ##########        ',
+    '       ########         ',
+    '        ######          ',
+    '         ####           ',
+    '          ##            ',
+    '          ##            ',
+    '          ##            ',
+    '          ##            ',
+    '         ####           ',
+    '        ######          ',
+    '       ########         ',
+    '      ##########        ',
+    '     ############       ',
+    '    ##############      ',
+    '    ##############      ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        '
+  ],
+  // 五角星（像素版）
+  star: [
+    '                        ',
+    '           ##           ',
+    '          ####          ',
+    '          ####          ',
+    '         ######         ',
+    '    ################    ',
+    '   ##################   ',
+    '   ##################   ',
+    '    ################    ',
+    '      ####    ####      ',
+    '     ######  ######     ',
+    '    ################    ',
+    '   ##################   ',
+    '   ##################   ',
+    '    ################    ',
+    '     ##############     ',
+    '      ############      ',
+    '       ##########       ',
+    '        ########        ',
+    '         ######         ',
+    '          ####          ',
+    '           ##           ',
+    '                        ',
+    '                        '
+  ],
+  // 月亮
+  moon: [
+    '                        ',
+    '       #######          ',
+    '     ###########        ',
+    '    #############       ',
+    '   ###############      ',
+    '  #################     ',
+    '  #################     ',
+    ' ###################    ',
+    ' ###################    ',
+    ' ###################    ',
+    ' ###################    ',
+    ' ###################    ',
+    ' ###################    ',
+    ' ###################    ',
+    '  #################     ',
+    '  #################     ',
+    '   ###############      ',
+    '    #############       ',
+    '     ###########        ',
+    '       #######          ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        '
+  ],
+  // 小猫
+  cat: [
+    '                        ',
+    '      ###      ###      ',
+    '     #####    #####     ',
+    '    #######  #######    ',
+    '    ################    ',
+    '   ##################   ',
+    '   ##################   ',
+    '  ####################  ',
+    '  ####  ####  ####  ### ',
+    '  ####  ####  ####  ### ',
+    '  ####################  ',
+    '  ####################  ',
+    '  ####################  ',
+    '   ##################   ',
+    '   ##################   ',
+    '    ################    ',
+    '     ##############     ',
+    '      ############      ',
+    '       ##########       ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        '
+  ],
+  // 咖啡杯
+  coffee: [
+    '                        ',
+    '                        ',
+    '      ############      ',
+    '     ##############     ',
+    '     ##############     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ###        ###     ',
+    '     ##############     ',
+    '      ############      ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        '
+  ],
+  // 云
+  cloud: [
+    '                        ',
+    '                        ',
+    '         ######         ',
+    '       ##########       ',
+    '      ############      ',
+    '     ##############     ',
+    '    ################    ',
+    '   ##################   ',
+    '  ####################  ',
+    ' ###################### ',
+    '########################',
+    '########################',
+    ' ###################### ',
+    '  ####################  ',
+    '   ##################   ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        ',
+    '                        '
+  ],
+  // 花
+  flower: [
+    '                        ',
+    '                        ',
+    '       ##      ##       ',
+    '      ####    ####      ',
+    '     ######  ######     ',
+    '     ######  ######     ',
+    '      ####    ####      ',
+    '       ##      ##       ',
+    '     ######  ######     ',
+    '    ################    ',
+    '   ##################   ',
+    '   ##################   ',
+    '    ################    ',
+    '     ######  ######     ',
+    '       ##      ##       ',
+    '       ##      ##       ',
+    '       ##      ##       ',
+    '       ##########       ',
+    '        ########        ',
+    '         ######         ',
+    '          ####          ',
+    '                        ',
+    '                        ',
+    '                        '
+  ]
+};
 
 function mulberry32(seed) {
   return function() {
@@ -117,105 +331,39 @@ function hashString(str) {
 function generatePixelArt(dateStr) {
   const rng = mulberry32(hashString(dateStr || '2026-01-01'));
   const pattern = PIXEL_PATTERNS[Math.floor(rng() * PIXEL_PATTERNS.length)];
-  const W = 96, H = 96;
+  const SRC = 24, DST = 96;
   const canvas = document.createElement('canvas');
-  canvas.width = W; canvas.height = H;
+  canvas.width = DST; canvas.height = DST;
   const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = false;
 
-  // 1. 画一个灰度图案到离屏 canvas（模拟「原图」）
-  const g = document.createElement('canvas');
-  g.width = W; g.height = H;
-  const gx = g.getContext('2d');
-  gx.fillStyle = '#fff'; gx.fillRect(0, 0, W, H);
-  gx.fillStyle = '#000';
-  gx.strokeStyle = '#000';
-  gx.lineWidth = 1.5;
-  gx.lineCap = 'square';
-
-  const cx = W / 2, cy = H / 2;
-  const rnd = () => rng();
-
-  if (pattern === 'plant') {
-    // 盆栽
-    gx.fillRect(cx - 18, cy + 10, 36, 18);
-    gx.fillRect(cx - 2, cy - 28, 4, 38);
-    gx.beginPath(); gx.ellipse(cx - 10, cy - 22, 8, 5, Math.PI / 4, 0, Math.PI * 2); gx.fill();
-    gx.beginPath(); gx.ellipse(cx + 10, cy - 22, 8, 5, -Math.PI / 4, 0, Math.PI * 2); gx.fill();
-    gx.beginPath(); gx.ellipse(cx, cy - 34, 6, 4, 0, 0, Math.PI * 2); gx.fill();
-  } else if (pattern === 'hourglass') {
-    // 沙漏
-    gx.beginPath(); gx.moveTo(cx - 22, cy - 30); gx.lineTo(cx + 22, cy - 30);
-    gx.lineTo(cx - 2, cy); gx.lineTo(cx + 2, cy); gx.closePath(); gx.fill();
-    gx.beginPath(); gx.moveTo(cx - 2, cy); gx.lineTo(cx + 2, cy);
-    gx.lineTo(cx + 22, cy + 30); gx.lineTo(cx - 22, cy + 30); gx.closePath(); gx.fill();
-    gx.fillRect(cx - 24, cy - 32, 48, 3); gx.fillRect(cx - 24, cy + 29, 48, 3);
-  } else if (pattern === 'star') {
-    // 五角星
-    gx.beginPath();
-    for (let i = 0; i < 10; i++) {
-      const r = i % 2 === 0 ? 28 : 12, a = (i * Math.PI) / 5 - Math.PI / 2;
-      gx.lineTo(cx + r * Math.cos(a), cy + r * Math.sin(a));
-    }
-    gx.closePath(); gx.fill();
-  } else if (pattern === 'moon') {
-    // 月亮
-    gx.beginPath(); gx.arc(cx - 4, cy, 26, 0, Math.PI * 2); gx.fill();
-    gx.fillStyle = '#fff'; gx.beginPath(); gx.arc(cx + 6, cy - 4, 22, 0, Math.PI * 2); gx.fill();
-  } else if (pattern === 'cat') {
-    // 小猫脸
-    gx.beginPath(); gx.arc(cx, cy + 2, 22, 0, Math.PI * 2); gx.fill();
-    gx.beginPath(); gx.moveTo(cx - 20, cy - 10); gx.lineTo(cx - 28, cy - 30); gx.lineTo(cx - 8, cy - 18); gx.closePath(); gx.fill();
-    gx.beginPath(); gx.moveTo(cx + 20, cy - 10); gx.lineTo(cx + 28, cy - 30); gx.lineTo(cx + 8, cy - 18); gx.closePath(); gx.fill();
-    gx.fillStyle = '#fff'; gx.fillRect(cx - 8, cy - 2, 4, 4); gx.fillRect(cx + 4, cy - 2, 4, 4);
-  } else if (pattern === 'coffee') {
-    // 咖啡杯
-    gx.fillRect(cx - 16, cy - 16, 32, 36);
-    gx.beginPath(); gx.arc(cx + 16, cy - 2, 9, -Math.PI / 2, Math.PI / 2); gx.stroke();
-    gx.fillRect(cx - 18, cy - 20, 36, 5);
-    // 热气
-    gx.strokeStyle = '#000';
-    gx.beginPath(); gx.moveTo(cx - 6, cy - 28); gx.quadraticCurveTo(cx - 10, cy - 36, cx - 4, cy - 42); gx.stroke();
-    gx.beginPath(); gx.moveTo(cx + 6, cy - 28); gx.quadraticCurveTo(cx + 10, cy - 36, cx + 4, cy - 42); gx.stroke();
-  } else if (pattern === 'cloud') {
-    // 云
-    gx.beginPath(); gx.arc(cx - 16, cy + 6, 14, 0, Math.PI * 2); gx.fill();
-    gx.beginPath(); gx.arc(cx + 16, cy + 6, 14, 0, Math.PI * 2); gx.fill();
-    gx.beginPath(); gx.arc(cx, cy - 8, 18, 0, Math.PI * 2); gx.fill();
-    gx.fillRect(cx - 22, cy + 6, 44, 14);
-  } else if (pattern === 'flower') {
-    // 花
-    for (let i = 0; i < 6; i++) {
-      const a = (i * Math.PI) / 3;
-      gx.beginPath(); gx.ellipse(cx + 14 * Math.cos(a), cy + 14 * Math.sin(a), 7, 4, a, 0, Math.PI * 2); gx.fill();
-    }
-    gx.beginPath(); gx.arc(cx, cy, 7, 0, Math.PI * 2); gx.fill();
-    gx.fillRect(cx - 2, cy + 7, 4, 22);
-  }
-
-  // 随机装饰：小星星/点
-  gx.fillStyle = '#000';
-  for (let i = 0; i < 8; i++) {
-    if (rnd() > 0.6) {
-      const x = 6 + Math.floor(rnd() * (W - 12));
-      const y = 6 + Math.floor(rnd() * (H - 12));
-      gx.fillRect(x, y, 2, 2);
+  // 1. 在 24x24 离屏 canvas 上画手工位图
+  const srcCanvas = document.createElement('canvas');
+  srcCanvas.width = SRC; srcCanvas.height = SRC;
+  const sx = srcCanvas.getContext('2d');
+  sx.fillStyle = '#ffffff'; sx.fillRect(0, 0, SRC, SRC);
+  sx.fillStyle = '#1a1a1a';
+  const bitmap = PIXEL_BITMAPS[pattern];
+  for (let y = 0; y < SRC; y++) {
+    const row = bitmap[y] || '';
+    for (let x = 0; x < SRC; x++) {
+      if (row[x] === '#') sx.fillRect(x, y, 1, 1);
     }
   }
 
-  // 2. 用 Bayer 4x4 ordered dither 转成 1-bit
-  const src = gx.getImageData(0, 0, W, H).data;
-  const dst = ctx.createImageData(W, H);
-  for (let y = 0; y < H; y++) {
-    for (let x = 0; x < W; x++) {
-      const i = (y * W + x) * 4;
-      const gray = src[i] * 0.299 + src[i + 1] * 0.587 + src[i + 2] * 0.114;
-      const threshold = (BAYER_4X4[y % 4][x % 4] / 16) * 255;
-      const c = gray > threshold ? 255 : 0;
-      dst.data[i] = dst.data[i + 1] = dst.data[i + 2] = c;
-      dst.data[i + 3] = 255;
-    }
-  }
-  ctx.putImageData(dst, 0, 0);
+  // 2. 放大到 96x96，保持像素锐利
+  ctx.drawImage(srcCanvas, 0, 0, SRC, SRC, 0, 0, DST, DST);
+
+  // 3. 加少量装饰性小点（不碰主体位图，控制数量避免碎）
+  ctx.fillStyle = '#1a1a1a';
+  const dots = [
+    [4, 4], [90, 4], [4, 90], [90, 90],
+    [10, 88], [86, 88], [8, 12], [88, 12]
+  ];
+  dots.forEach(([x, y]) => {
+    if (rng() > 0.35) ctx.fillRect(x, y, 2, 2);
+  });
+
   return { dataUrl: canvas.toDataURL('image/png'), pattern };
 }
 
