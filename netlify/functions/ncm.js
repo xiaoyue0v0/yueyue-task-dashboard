@@ -35,18 +35,50 @@ function weapi(obj) {
   return { params, encSecKey };
 }
 
-async function weapiPost(url, obj) {
-  const body = weapi(obj);
-  const resp = await fetch(url, {
+// 先 GET 首页拿到 __csrf cookie（网易云 weapi 对非登录请求要求带 cookie，否则返回空 body）
+async function obtainCookie() {
+  try {
+    const resp = await fetch('https://music.163.com/', {
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+    });
+    const sc = resp.headers.get('set-cookie') || '';
+    const cookies = sc.split(',').map(s => s.split(';')[0].trim()).filter(Boolean);
+    const m = sc.match(/__csrf=([0-9a-fA-F]+)/);
+    const csrf = m ? m[1] : '';
+    return { csrf, cookie: cookies.join('; ') };
+  } catch (e) {
+    return { csrf: '', cookie: '' };
+  }
+}
+
+async function weapiPost(url, obj, ctx) {
+  const csrf = (ctx && ctx.csrf) || '';
+  const body = weapi(Object.assign({ csrf_token: csrf }, obj));
+  const headers = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    'Referer': 'https://music.163.com/',
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+  };
+  if (ctx && ctx.cookie) headers['Cookie'] = ctx.cookie;
+  const resp = await fetch(url + (url.includes('?') ? '&' : '?') + 'csrf_token=' + encodeURIComponent(csrf), {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-      'Referer': 'https://music.163.com/',
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-    },
+    headers,
     body: new URLSearchParams(body).toString()
   });
-  return resp.json();
+  const text = await resp.text();
+  if (!text) {
+    const err = new Error('网易云返回空响应（大概率被风控拦截/需要登录态）');
+    err.code = 'EMPTY_BODY';
+    throw err;
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    const err = new Error('网易云返回非 JSON: ' + text.slice(0, 120));
+    err.code = 'BAD_JSON';
+    throw err;
+  }
 }
 
 // 简易内存缓存：同一 uid 一小时只抓一次，避免频繁打网易云
@@ -83,8 +115,13 @@ exports.handler = async (event) => {
   }
 
   try {
+    const ctx = await obtainCookie();
+
     // 1) 拿到用户的歌单列表，找「我喜欢的音乐」(specialType === 5)
-    const pl = await weapiPost('https://music.163.com/weapi/user/playlist/?csrf_token=', { uid, limit: 1000, offset: 0 });
+    const pl = await weapiPost('https://music.163.com/weapi/user/playlist/?csrf_token=', { uid, limit: 1000, offset: 0 }, ctx);
+    if (pl.code && pl.code !== 200) {
+      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: '网易云拒绝请求', code: pl.code, hint: '可能是该 UID 歌单设为私密，或网易云临时限流' }) };
+    }
     const playlists = pl.playlist || [];
     const liked = playlists.find(p => p.specialType === 5)
       || playlists.find(p => /喜欢|红心|liked/i.test(p.name || ''));
@@ -93,16 +130,17 @@ exports.handler = async (event) => {
     }
 
     // 2) 拿歌单详情里的歌曲（最多 1000 首）
-    const detail = await weapiPost('https://music.163.com/weapi/v3/playlist/detail?csrf_token=', { id: String(liked.id), n: 1000, s: 8 });
+    const detail = await weapiPost('https://music.163.com/weapi/v3/playlist/detail?csrf_token=', { id: String(liked.id), n: 1000, s: 8 }, ctx);
     const songs = (detail.playlist && (detail.playlist.tracks || detail.playlist.songs)) || [];
     const list = songs.map(normalizeSong).filter(s => s.coverUrl);
     if (list.length === 0) {
-      return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: '歌单里没有可读取的歌曲' }) };
+      return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: '歌单里没有可读取的歌曲', hint: '可能是「我喜欢的音乐」设为私密或为空' }) };
     }
 
     cache.set(uid, { ts: now, list });
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, playlistId: liked.id, count: list.length, list }) };
   } catch (e) {
-    return { statusCode: 500, headers: CORS, body: JSON.stringify({ error: '抓取失败', detail: String((e && e.message) || e) }) };
+    const code = (e && e.code === 'EMPTY_BODY') ? 503 : 500;
+    return { statusCode: code, headers: CORS, body: JSON.stringify({ error: '抓取失败', detail: String((e && e.message) || e), code: (e && e.code) || 'UNKNOWN' }) };
   }
 };
