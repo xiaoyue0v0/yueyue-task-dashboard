@@ -34,7 +34,7 @@
 
 - 纯静态三件套：`index.html` + `style.css` + `app.js`
 - `supabase.umd.js`：Supabase JS v2（仅用于可选的云端同步，不引入也能跑）
-- `netlify/functions/ncm.js` + `ncm-cover.js`：网易云代理（weapi 抓取「我喜欢的音乐」+ 封面图 CORS 代理），**仅网易云功能需要**，且只在连了 Git 的 Netlify 上运行
+- `netlify/functions/ncm.js` + `ncm-cover.js`：网易云代理（`ncm.js` 转发到 NeteaseCloudMusicApi 后端拉「我喜欢的音乐」；`ncm-cover.js` 做封面图 CORS 代理供 Canvas 像素化），**仅网易云功能需要**，且只在连了 Git 的 Netlify 上运行
 - **无构建步骤**，打开即用
 
 ---
@@ -102,7 +102,7 @@ python3 -m http.server 8000
 | `DEPLOY.md` | 部署说明 |
 | `SUPABASE_SETUP.md` | 云端同步建表与配置说明 |
 | `netlify.toml` | Netlify 配置（发布目录 + 函数目录） |
-| `netlify/functions/ncm.js` | 网易云「我喜欢的音乐」代理（weapi） |
+| `netlify/functions/ncm.js` | 网易云「我喜欢的音乐」代理（转发到 NeteaseCloudMusicApi 后端） |
 | `netlify/functions/ncm-cover.js` | 网易云封面图 CORS 代理（供 Canvas 像素化） |
 | `preview-*.png` | 各功能界面历史预览截图 |
 
@@ -112,7 +112,8 @@ python3 -m http.server 8000
 
 - 数据默认只存你本地浏览器（`localStorage`），不经过任何第三方。
 - 开启云端同步后，数据会经过**你自己的** Supabase 项目，密钥由你掌控。
-- 网易云 **UID 只存在你本地浏览器**（`yueyue-ncm-uid`），不会进仓库；「今日歌曲」通过**你自己的** Netlify 函数去抓网易云公开数据，不依赖任何第三方中转到账。
+- 网易云 **UID 只存在你本地浏览器**（`yueyue-ncm-uid`），不会进仓库。
+- 「今日歌曲」由你自己的 Netlify 函数 `ncm.js` 去抓网易云公开数据。函数默认把请求**转发到一个公开的 NeteaseCloudMusicApi 实例**（与开源 CloudMusicAnalyst 同款后端）。如果你想要完全自控，可以在 Netlify 控制台设置环境变量 `NCM_API_BASE` 指向**你自己部署**的 NeteaseCloudMusicApi（Render / Vercel / 自己的服务器均可），这样数据不经过任何第三方。
 - 不要把含真实任务数据的导出文件（`*.export.json`）提交进仓库。
 
 ---

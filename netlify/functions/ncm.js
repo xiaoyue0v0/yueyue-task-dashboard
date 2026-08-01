@@ -1,88 +1,48 @@
-// 网易云「我喜欢的音乐」代理（无登录、纯公开数据）
-// GET /.netlify/functions/ncm?uid=XXXX
-// 返回 { ok, count, list:[{id,name,artist,coverUrl}] }
-const crypto = require('crypto');
+// 网易云「我喜欢的音乐」代理
+// 做法：代理到成熟的 NeteaseCloudMusicApi 后端（与开源 CloudMusicAnalyst 同款方案），
+// 不再手写 weapi 加密（手写版容易被网易云风控返回空 body）。
+//
+// 端点：
+//   GET /.netlify/functions/ncm?uid=XXXX
+// 返回：{ ok, playlistId, count, list:[{id,name,artist,coverUrl}] }
+//
+// 后端地址可配：在 Netlify 控制台设置环境变量 NCM_API_BASE 即可换成你自己部署的实例。
+// 默认用 CloudMusicAnalyst 项目同款公开备份实例。
+const NCM_API_BASE = (process.env.NCM_API_BASE || 'https://netease-cloud-music-api-backup-94lcuvn5c.vercel.app').replace(/\/$/, '');
 
-const MODULUS = '00e0b509f6259df8642dbc35662901477df22677ec152b5ff68ace615bb7b72515252c526534831538bef1d0a7a7bdef8113e4714c7485e5b4f2f9eecaa4aac5d4c0e6a6c0c0a8a8';
-const PUB_EXP = '010001';
-const IV = '0102030405060708';
-const NONCE = '0CoJUm6Qyw8W8jud';
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Content-Type': 'application/json; charset=utf-8'
+};
 
-function createSecretKey(size = 16) {
-  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let key = '';
-  for (let i = 0; i < size; i++) key += chars[Math.floor(Math.random() * chars.length)];
-  return key;
-}
+// 简易内存缓存：同一 uid 一小时只抓一次，避免频繁打上游
+const cache = new Map();
 
-function aesEncrypt(text, key) {
-  const cipher = crypto.createCipheriv('aes-128-cbc', Buffer.from(key, 'utf8'), Buffer.from(IV, 'utf8'));
-  return Buffer.concat([cipher.update(Buffer.from(text, 'utf8')), cipher.final()]).toString('base64');
-}
-
-function rsaEncrypt(text) {
-  const reversed = text.split('').reverse().join('');
-  const big = BigInt('0x' + Buffer.from(reversed).toString('hex'));
-  const enc = (big ** BigInt('0x' + PUB_EXP)) % BigInt('0x' + MODULUS);
-  return enc.toString(16).padStart(256, '0');
-}
-
-function weapi(obj) {
-  const text = JSON.stringify(obj);
-  const secret = createSecretKey(16);
-  const params = aesEncrypt(aesEncrypt(text, NONCE), secret);
-  const encSecKey = rsaEncrypt(secret);
-  return { params, encSecKey };
-}
-
-// 先 GET 首页拿到 __csrf cookie（网易云 weapi 对非登录请求要求带 cookie，否则返回空 body）
-async function obtainCookie() {
-  try {
-    const resp = await fetch('https://music.163.com/', {
-      method: 'GET',
-      headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
-    });
-    const sc = resp.headers.get('set-cookie') || '';
-    const cookies = sc.split(',').map(s => s.split(';')[0].trim()).filter(Boolean);
-    const m = sc.match(/__csrf=([0-9a-fA-F]+)/);
-    const csrf = m ? m[1] : '';
-    return { csrf, cookie: cookies.join('; ') };
-  } catch (e) {
-    return { csrf: '', cookie: '' };
-  }
-}
-
-async function weapiPost(url, obj, ctx) {
-  const csrf = (ctx && ctx.csrf) || '';
-  const body = weapi(Object.assign({ csrf_token: csrf }, obj));
-  const headers = {
-    'Content-Type': 'application/x-www-form-urlencoded',
-    'Referer': 'https://music.163.com/',
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-  };
-  if (ctx && ctx.cookie) headers['Cookie'] = ctx.cookie;
-  const resp = await fetch(url + (url.includes('?') ? '&' : '?') + 'csrf_token=' + encodeURIComponent(csrf), {
-    method: 'POST',
-    headers,
-    body: new URLSearchParams(body).toString()
+async function ncmGet(path, query) {
+  const url = `${NCM_API_BASE}${path}?${query}`;
+  const resp = await fetch(url, {
+    method: 'GET',
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://music.163.com/'
+    }
   });
   const text = await resp.text();
   if (!text) {
-    const err = new Error('网易云返回空响应（大概率被风控拦截/需要登录态）');
+    const err = new Error('NeteaseCloudMusicApi 返回空响应（上游可能限流或临时不可用）');
     err.code = 'EMPTY_BODY';
     throw err;
   }
+  let data;
   try {
-    return JSON.parse(text);
+    data = JSON.parse(text);
   } catch (e) {
-    const err = new Error('网易云返回非 JSON: ' + text.slice(0, 120));
+    const err = new Error('NeteaseCloudMusicApi 返回非 JSON: ' + text.slice(0, 120));
     err.code = 'BAD_JSON';
     throw err;
   }
+  return { status: resp.status, data };
 }
-
-// 简易内存缓存：同一 uid 一小时只抓一次，避免频繁打网易云
-const cache = new Map();
 
 function normalizeSong(song) {
   const al = song.al || song.album || {};
@@ -90,16 +50,11 @@ function normalizeSong(song) {
   const cover = (al.picUrl || '').replace(/^http:\/\//, 'https://');
   return {
     id: song.id,
-    name: song.name,
+    name: song.name || '未知',
     artist: artists.map(a => a.name).filter(Boolean).join('/') || '未知歌手',
     coverUrl: cover
   };
 }
-
-const CORS = {
-  'Access-Control-Allow-Origin': '*',
-  'Content-Type': 'application/json; charset=utf-8'
-};
 
 exports.handler = async (event) => {
   const qs = event.queryStringParameters || {};
@@ -115,23 +70,22 @@ exports.handler = async (event) => {
   }
 
   try {
-    const ctx = await obtainCookie();
-
-    // 1) 拿到用户的歌单列表，找「我喜欢的音乐」(specialType === 5)
-    const pl = await weapiPost('https://music.163.com/weapi/user/playlist/?csrf_token=', { uid, limit: 1000, offset: 0 }, ctx);
+    // 1) 获取该用户的歌单列表，筛出本人创建的，再找「我喜欢的音乐」(specialType === 5)
+    const { status: ps, data: pl } = await ncmGet('/user/playlist', 'uid=' + encodeURIComponent(uid) + '&limit=1000&offset=0');
     if (pl.code && pl.code !== 200) {
-      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: '网易云拒绝请求', code: pl.code, hint: '可能是该 UID 歌单设为私密，或网易云临时限流' }) };
+      return { statusCode: 502, headers: CORS, body: JSON.stringify({ error: 'NeteaseCloudMusicApi 拒绝请求', code: pl.code, hint: '上游可能限流，稍后重试' }) };
     }
-    const playlists = pl.playlist || [];
-    const liked = playlists.find(p => p.specialType === 5)
-      || playlists.find(p => /喜欢|红心|liked/i.test(p.name || ''));
+    const all = pl.playlist || [];
+    const mine = all.filter(p => String(p.userId) === String(uid) || (p.creator && String(p.creator.userId) === String(uid)));
+    const liked = mine.find(p => p.specialType === 5)
+      || mine.find(p => /喜欢|红心|liked/i.test(p.name || ''));
     if (!liked) {
       return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: '未找到「我喜欢的音乐」歌单', hint: '请确认 UID 正确，且该歌单为公开' }) };
     }
 
-    // 2) 拿歌单详情里的歌曲（最多 1000 首）
-    const detail = await weapiPost('https://music.163.com/weapi/v3/playlist/detail?csrf_token=', { id: String(liked.id), n: 1000, s: 8 }, ctx);
-    const songs = (detail.playlist && (detail.playlist.tracks || detail.playlist.songs)) || [];
+    // 2) 拉歌单全部曲目（最多 1000 首）
+    const { status: ts, data: tr } = await ncmGet('/playlist/track/all', 'id=' + encodeURIComponent(liked.id) + '&limit=1000&offset=0');
+    const songs = tr.songs || (tr.playlist && tr.playlist.tracks) || [];
     const list = songs.map(normalizeSong).filter(s => s.coverUrl);
     if (list.length === 0) {
       return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: '歌单里没有可读取的歌曲', hint: '可能是「我喜欢的音乐」设为私密或为空' }) };
