@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
   <title>悦悦回国任务台</title>
-  <link rel="stylesheet" href="style.css?v=38">
+  <link rel="stylesheet" href="style.css?v=39">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐿️%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -55,16 +55,14 @@
       </div>
     </section>
 
-    <section class="view-tabs">
-      <button class="tab-btn active" id="tab-main" onclick="app.switchView('main')">📋 任务与日程</button>
-      <button class="tab-btn" id="tab-today" onclick="app.switchView('today')">✅ 今日待办</button>
-      <button class="tab-btn" id="tab-habits" onclick="app.switchView('habits')">🔥 打卡日历</button>
-      <button class="tab-btn" id="tab-poop" onclick="app.switchView('poop')">💩 拉粑粑</button>
-      <button class="tab-btn" id="tab-skincare" onclick="app.switchView('skincare')">🧴 护肤</button>
-      <button class="tab-btn" id="tab-receipt" onclick="app.switchView('receipt')">🧾 小票</button>
-    </section>
+    <nav class="view-tabs" id="view-tabs">
+      <button class="tab-btn active" data-view="today" onclick="app.switchView('today')">✅ 今日</button>
+      <button class="tab-btn" data-view="plan" onclick="app.switchView('plan')">📋 计划</button>
+      <button class="tab-btn" data-view="record" onclick="app.switchView('record')">📒 记录</button>
+      <button class="tab-btn" data-view="receipt" onclick="app.switchView('receipt')">🧾 小票</button>
+    </nav>
 
-    <section class="main-view" id="main-view">
+    <section class="main-view" id="plan-view">
       <section class="filters" id="list-filters">
         <div class="filter-group">
           <span class="filter-label">分类：</span>
@@ -190,87 +188,107 @@
       </div>
     </section>
 
-    <section class="habits-view" id="habits-view" style="display: none;">
-      <div class="habits-toolbar">
-        <h3>每日固定日程</h3>
-        <button class="btn btn-primary btn-small" onclick="app.openRoutineModal()">+ 新增固定日程</button>
-      </div>
-      <div class="routines-list" id="routines-list"></div>
-      <div class="calendar-header" style="margin-top: 20px;">
-        <button class="icon-btn" onclick="app.changeHabitMonth(-1)">‹</button>
-        <h2 id="habit-calendar-month-title">2026年7月</h2>
-        <button class="icon-btn" onclick="app.changeHabitMonth(1)">›</button>
-      </div>
-      <div class="calendar-grid habit-calendar-grid" id="habit-calendar-grid"></div>
-    </section>
+    <section class="record-view" id="record-view" style="display: none;">
+      <!-- 记录首页（hub）：固定日程 + 两张醒目的功能卡 -->
+      <div id="record-hub">
+        <div class="habits-toolbar">
+          <h3>每日固定日程</h3>
+          <button class="btn btn-primary btn-small" onclick="app.openRoutineModal()">+ 新增固定日程</button>
+        </div>
+        <div class="routines-list" id="routines-list"></div>
+        <div class="calendar-header" style="margin-top: 20px;">
+          <button class="icon-btn" onclick="app.changeHabitMonth(-1)">‹</button>
+          <h2 id="habit-calendar-month-title">2026年7月</h2>
+          <button class="icon-btn" onclick="app.changeHabitMonth(1)">›</button>
+        </div>
+        <div class="calendar-grid habit-calendar-grid" id="habit-calendar-grid"></div>
 
-    <div class="empty-state" id="empty-state" style="display: none;">
-      <div class="empty-icon">📝</div>
-      <h3>还没有任务</h3>
-      <p>点击右上角“新增任务”开始规划吧</p>
-    </div>
+        <div class="record-cards">
+          <button class="record-card record-card-skincare" onclick="app.openRecordModule('skincare')">
+            <span class="record-card-icon">🧴</span>
+            <span class="record-card-title">护肤</span>
+            <span class="record-card-sub" id="record-card-skincare-sub">记录每日护肤</span>
+          </button>
+          <button class="record-card record-card-poop" onclick="app.openRecordModule('poop')">
+            <span class="record-card-icon">💩</span>
+            <span class="record-card-title">拉粑粑</span>
+            <span class="record-card-sub" id="record-card-poop-sub">记录每日打卡</span>
+          </button>
+        </div>
+      </div>
 
-    <section class="poop-view" id="poop-view" style="display: none;">
-      <div class="poop-stats">
-        <div class="poop-stat-card">
-          <div class="poop-stat-num" id="poop-total">0</div>
-          <div class="poop-stat-label">累计天数</div>
+      <!-- 护肤模块 -->
+      <div id="record-skincare" style="display:none;">
+        <div class="record-module-back">
+          <button class="today-nav-btn" onclick="app.openRecordHub()">‹</button>
+          <span class="record-module-title">🧴 护肤</span>
         </div>
-        <div class="poop-stat-card">
-          <div class="poop-stat-num" id="poop-current">0</div>
-          <div class="poop-stat-label">当前连续</div>
+        <div class="skincare-stats">
+          <div class="skincare-stat-card">
+            <div class="skincare-stat-num" id="skincare-total">0</div>
+            <div class="skincare-stat-label">累计护肤天数</div>
+          </div>
+          <div class="skincare-stat-card skincare-card-mask">
+            <div class="skincare-stat-num" id="skincare-month-mask">0</div>
+            <div class="skincare-stat-label">本月面膜</div>
+          </div>
+          <div class="skincare-stat-card skincare-card-apply">
+            <div class="skincare-stat-num" id="skincare-month-apply">0</div>
+            <div class="skincare-stat-label">本月护肤</div>
+          </div>
+          <div class="skincare-stat-card skincare-card-salon">
+            <div class="skincare-stat-num" id="skincare-month-salon">0</div>
+            <div class="skincare-stat-label">本月美容店</div>
+          </div>
         </div>
-        <div class="poop-stat-card">
-          <div class="poop-stat-num" id="poop-best">0</div>
-          <div class="poop-stat-label">最长连续</div>
+        <p class="skincare-tip">点日历里的日期，勾选当天做了哪几类护肤（可多选）。今天还没记的话，点下方按钮快速记录～</p>
+        <div class="calendar-header skincare-calendar-header">
+          <button class="icon-btn" onclick="app.changeSkincareMonth(-1)">‹</button>
+          <h2 id="skincare-month-title">2026年8月</h2>
+          <button class="icon-btn" onclick="app.changeSkincareMonth(1)">›</button>
         </div>
-        <div class="poop-stat-card">
-          <div class="poop-stat-num" id="poop-month">0</div>
-          <div class="poop-stat-label">本月打卡</div>
+        <div class="calendar-grid skincare-calendar-grid" id="skincare-calendar-grid"></div>
+        <div class="skincare-today-action">
+          <button class="btn skincare-quick mask" onclick="app.recordSkincareToday('mask')">💆 记录今天做面膜</button>
+          <button class="btn skincare-quick apply" onclick="app.recordSkincareToday('apply')">🧴 记录今天擦护肤品</button>
+          <button class="btn skincare-quick salon" onclick="app.recordSkincareToday('salon')">💇 记录今天去美容店</button>
         </div>
       </div>
-      <p class="poop-tip">点一下有 💩 的格子表示那天拉了粑粑，再点一下取消。今天还没打卡的话，点下方按钮记录一下吧～</p>
-      <div class="calendar-header poop-calendar-header">
-        <button class="icon-btn" onclick="app.changePoopMonth(-1)">‹</button>
-        <h2 id="poop-month-title">2026年8月</h2>
-        <button class="icon-btn" onclick="app.changePoopMonth(1)">›</button>
-      </div>
-      <div class="calendar-grid poop-calendar-grid" id="poop-calendar-grid"></div>
-      <div class="poop-today-action">
-        <button class="btn btn-primary" onclick="app.togglePoop(app.todayStr())">💩 记录今天</button>
-      </div>
-    </section>
 
-    <section class="skincare-view" id="skincare-view" style="display: none;">
-      <div class="skincare-stats">
-        <div class="skincare-stat-card">
-          <div class="skincare-stat-num" id="skincare-total">0</div>
-          <div class="skincare-stat-label">累计护肤天数</div>
+      <!-- 拉粑粑模块 -->
+      <div id="record-poop" style="display:none;">
+        <div class="record-module-back">
+          <button class="today-nav-btn" onclick="app.openRecordHub()">‹</button>
+          <span class="record-module-title">💩 拉粑粑</span>
         </div>
-        <div class="skincare-stat-card skincare-card-mask">
-          <div class="skincare-stat-num" id="skincare-month-mask">0</div>
-          <div class="skincare-stat-label">本月面膜</div>
+        <div class="poop-stats">
+          <div class="poop-stat-card">
+            <div class="poop-stat-num" id="poop-total">0</div>
+            <div class="poop-stat-label">累计天数</div>
+          </div>
+          <div class="poop-stat-card">
+            <div class="poop-stat-num" id="poop-current">0</div>
+            <div class="poop-stat-label">当前连续</div>
+          </div>
+          <div class="poop-stat-card">
+            <div class="poop-stat-num" id="poop-best">0</div>
+            <div class="poop-stat-label">最长连续</div>
+          </div>
+          <div class="poop-stat-card">
+            <div class="poop-stat-num" id="poop-month">0</div>
+            <div class="poop-stat-label">本月打卡</div>
+          </div>
         </div>
-        <div class="skincare-stat-card skincare-card-apply">
-          <div class="skincare-stat-num" id="skincare-month-apply">0</div>
-          <div class="skincare-stat-label">本月护肤</div>
+        <p class="poop-tip">点一下有 💩 的格子表示那天拉了粑粑，再点一下取消。今天还没打卡的话，点下方按钮记录一下吧～</p>
+        <div class="calendar-header poop-calendar-header">
+          <button class="icon-btn" onclick="app.changePoopMonth(-1)">‹</button>
+          <h2 id="poop-month-title">2026年8月</h2>
+          <button class="icon-btn" onclick="app.changePoopMonth(1)">›</button>
         </div>
-        <div class="skincare-stat-card skincare-card-salon">
-          <div class="skincare-stat-num" id="skincare-month-salon">0</div>
-          <div class="skincare-stat-label">本月美容店</div>
+        <div class="calendar-grid poop-calendar-grid" id="poop-calendar-grid"></div>
+        <div class="poop-today-action">
+          <button class="btn btn-primary" onclick="app.togglePoop(app.todayStr())">💩 记录今天</button>
         </div>
-      </div>
-      <p class="skincare-tip">点日历里的日期，勾选当天做了哪几类护肤（可多选）。今天还没记的话，点下方按钮快速记录～</p>
-      <div class="calendar-header skincare-calendar-header">
-        <button class="icon-btn" onclick="app.changeSkincareMonth(-1)">‹</button>
-        <h2 id="skincare-month-title">2026年8月</h2>
-        <button class="icon-btn" onclick="app.changeSkincareMonth(1)">›</button>
-      </div>
-      <div class="calendar-grid skincare-calendar-grid" id="skincare-calendar-grid"></div>
-      <div class="skincare-today-action">
-        <button class="btn skincare-quick mask" onclick="app.recordSkincareToday('mask')">💆 记录今天做面膜</button>
-        <button class="btn skincare-quick apply" onclick="app.recordSkincareToday('apply')">🧴 记录今天擦护肤品</button>
-        <button class="btn skincare-quick salon" onclick="app.recordSkincareToday('salon')">💇 记录今天去美容店</button>
       </div>
     </section>
 
@@ -617,6 +635,26 @@
     </div>
   </div>
 
+  <!-- 底部导航栏（移动端显示，桌面端隐藏） -->
+  <nav class="bottom-nav" id="bottom-nav">
+    <button class="bottom-nav-item active" data-view="today" onclick="app.switchView('today')">
+      <span class="bottom-nav-icon">✅</span>
+      <span class="bottom-nav-label">今日</span>
+    </button>
+    <button class="bottom-nav-item" data-view="plan" onclick="app.switchView('plan')">
+      <span class="bottom-nav-icon">📋</span>
+      <span class="bottom-nav-label">计划</span>
+    </button>
+    <button class="bottom-nav-item" data-view="record" onclick="app.switchView('record')">
+      <span class="bottom-nav-icon">📒</span>
+      <span class="bottom-nav-label">记录</span>
+    </button>
+    <button class="bottom-nav-item" data-view="receipt" onclick="app.switchView('receipt')">
+      <span class="bottom-nav-icon">🧾</span>
+      <span class="bottom-nav-label">小票</span>
+    </button>
+  </nav>
+
   <!-- 悬浮便签纸：在所有工作台之上，一键打开/收起，可随意记录 -->
   <div id="sticky-note" class="sticky-note collapsed">
     <button id="sticky-toggle" class="sticky-toggle" aria-label="打开便签">📝</button>
@@ -631,6 +669,6 @@
 
   <script src="supabase.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.4/dist/dom-to-image-more.min.js"></script>
-  <script src="app.js?v=38"></script>
+  <script src="app.js?v=39"></script>
 </body>
 </html>

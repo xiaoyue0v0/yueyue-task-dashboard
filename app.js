@@ -396,7 +396,8 @@ class TaskApp {
     this.searchQuery = '';
     this.expandedTasks = new Set();
     this.collapsedCategories = new Set();
-    this.currentView = 'main';
+    this.currentView = 'today';
+    this.recordSub = 'hub';
     this.todayFilter = 'all';
     this.todayViewDate = this.todayStr();
     this.todayCalendarMonth = new Date();
@@ -511,7 +512,7 @@ class TaskApp {
     const newMode = this.getLayoutMode();
     if (newMode !== this.layoutMode) {
       this.layoutMode = newMode;
-      if (this.currentView === 'main') {
+      if (this.currentView === 'plan') {
         this.renderTasks();
         this.renderScheduleCalendar();
       }
@@ -558,38 +559,95 @@ class TaskApp {
   // View switching
   switchView(view) {
     this.currentView = view;
-    document.getElementById('tab-main').classList.toggle('active', view === 'main');
-    document.getElementById('tab-today').classList.toggle('active', view === 'today');
-    document.getElementById('tab-habits').classList.toggle('active', view === 'habits');
-    document.getElementById('tab-poop').classList.toggle('active', view === 'poop');
-    document.getElementById('tab-skincare').classList.toggle('active', view === 'skincare');
-    document.getElementById('tab-receipt').classList.toggle('active', view === 'receipt');
+    // 同时高亮顶部标签栏与底部导航栏（共用 data-view 属性）
+    document.querySelectorAll('[data-view]').forEach(el => {
+      el.classList.toggle('active', el.getAttribute('data-view') === view);
+    });
+    if (view === 'record') this.recordSub = 'hub';
     this.renderView();
   }
 
   renderView() {
-    document.getElementById('main-view').style.display = this.currentView === 'main' ? 'flex' : 'none';
-    document.getElementById('today-view').style.display = this.currentView === 'today' ? 'block' : 'none';
-    document.getElementById('habits-view').style.display = this.currentView === 'habits' ? 'block' : 'none';
-    document.getElementById('poop-view').style.display = this.currentView === 'poop' ? 'block' : 'none';
-    document.getElementById('skincare-view').style.display = this.currentView === 'skincare' ? 'block' : 'none';
-    document.getElementById('receipt-view').style.display = this.currentView === 'receipt' ? 'block' : 'none';
-    document.getElementById('empty-state').style.display = 'none';
+    const viewMap = {
+      today: 'today-view',
+      plan: 'plan-view',
+      record: 'record-view',
+      receipt: 'receipt-view',
+    };
+    Object.keys(viewMap).forEach(v => {
+      const el = document.getElementById(viewMap[v]);
+      if (el) el.style.display = this.currentView === v ? 'block' : 'none';
+    });
+    const empty = document.getElementById('empty-state');
+    if (empty) empty.style.display = 'none';
 
-    if (this.currentView === 'main') {
+    if (this.currentView === 'plan') {
       this.renderTasks();
       this.renderScheduleCalendar();
     } else if (this.currentView === 'today') {
       this.renderTodayView();
-    } else if (this.currentView === 'habits') {
-      this.renderRoutines();
-      this.renderHabitCalendar();
-    } else if (this.currentView === 'poop') {
-      this.renderPoopView();
-    } else if (this.currentView === 'skincare') {
-      this.renderSkincareView();
+    } else if (this.currentView === 'record') {
+      this.renderRecordView();
     } else if (this.currentView === 'receipt') {
       this.renderReceiptView();
+    }
+  }
+
+  // ===== 记录页（hub / 护肤 / 拉粑粑）=====
+  renderRecordView() {
+    const hub = document.getElementById('record-hub');
+    const sk = document.getElementById('record-skincare');
+    const po = document.getElementById('record-poop');
+    if (hub) hub.style.display = this.recordSub === 'hub' ? 'block' : 'none';
+    if (sk) sk.style.display = this.recordSub === 'skincare' ? 'block' : 'none';
+    if (po) po.style.display = this.recordSub === 'poop' ? 'block' : 'none';
+    this.updateRecordCardStats();
+    if (this.recordSub === 'hub') {
+      this.renderRoutines();
+      this.renderHabitCalendar();
+    } else if (this.recordSub === 'skincare') {
+      this.renderSkincareView();
+    } else if (this.recordSub === 'poop') {
+      this.renderPoopView();
+    }
+  }
+
+  openRecordModule(module) {
+    this.recordSub = module;
+    this.renderRecordView();
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  openRecordHub() {
+    this.recordSub = 'hub';
+    this.renderRecordView();
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  }
+
+  updateRecordCardStats() {
+    const skSub = document.getElementById('record-card-skincare-sub');
+    const poSub = document.getElementById('record-card-poop-sub');
+    // 护肤：本月护肤天数
+    if (skSub) {
+      const y = this.skincareMonth ? this.skincareMonth.getFullYear() : new Date().getFullYear();
+      const m = this.skincareMonth ? this.skincareMonth.getMonth() : new Date().getMonth();
+      const dates = Object.keys(this.skincareDates || {});
+      const monthApply = dates.filter(d => {
+        const p = d.split('-').map(Number);
+        return p[0] === y && p[1] - 1 === m && this.skincareDates[d].apply;
+      }).length;
+      skSub.textContent = monthApply > 0 ? `本月已护肤 ${monthApply} 天` : '记录每日护肤';
+    }
+    // 拉粑粑：当前连续天数
+    if (poSub) {
+      const today = this.todayStr();
+      let streak = 0;
+      let cursor = today;
+      while (this.poopDates.includes(cursor)) {
+        streak++;
+        cursor = this.shiftDate(cursor, -1);
+      }
+      poSub.textContent = streak > 0 ? `已连续 ${streak} 天` : '记录每日打卡';
     }
   }
 
