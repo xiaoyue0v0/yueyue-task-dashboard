@@ -2521,6 +2521,38 @@ input::placeholder, textarea::placeholder {
   font-family: var(--font-pixel);
 }
 
+/* 小票分组：大标题 + 缩进子项 */
+.receipt-group {
+  margin-bottom: 12px;
+}
+.receipt-group-title {
+  font-size: 12px;
+  font-weight: 600;
+  font-family: var(--font-pixel);
+  color: #000;
+  padding-bottom: 4px;
+  margin-bottom: 5px;
+  border-bottom: 1px dashed #b9b3a4;
+  opacity: 0;
+  animation: itemIn 420ms ease-out both;
+}
+.receipt-group-items {
+  padding-left: 10px;
+}
+.receipt-row-sub {
+  font-size: 9px;
+  padding: 5px 0;
+}
+.receipt-row-sub .receipt-row-label {
+  max-width: 120px;
+}
+.receipt-row-sub .receipt-row-dots {
+  border-bottom-width: 1px;
+}
+.receipt-row-sub .receipt-row-value {
+  font-size: 9px;
+}
+
 .receipt-summary {
   font-size: 10px;
   font-family: var(--font-pixel);
