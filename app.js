@@ -3,6 +3,7 @@ const SYNC_CODE_KEY = 'yueyue-sync-code';
 const SYNC_REMOTE_KEY = 'yueyue-last-remote';
 const NCM_UID_KEY = 'yueyue-ncm-uid';
 const NCM_CACHE_KEY = 'yueyue-ncm-cache';
+const NCM_OFFSET_KEY = 'yueyue-ncm-offset';
 
 // Netlify functions 地址：在 Netlify 域名下用相对路径；在 GitHub Pages 等其他托管下用绝对路径（指向已部署的 Netlify 站点）
 const NCM_FUNC_BASE = (location.hostname.endsWith('netlify.app') || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
@@ -1413,17 +1414,67 @@ class TaskApp {
     const paper = document.querySelector('.receipt-paper');
     if (!paper) return;
 
-    const closeBtn = paper.querySelector('.receipt-close');
-    const actions = paper.querySelector('.receipt-actions');
-    const prevClose = closeBtn ? closeBtn.style.display : '';
-    const prevActions = actions ? actions.style.display : '';
-    if (closeBtn) closeBtn.style.display = 'none';
-    if (actions) actions.style.display = 'none';
+    // 等字体加载完成再导出，避免文字渲染不完整
+    if (document.fonts) {
+      try { await document.fonts.ready; } catch (e) {}
+    }
+
+    // 克隆到离屏固定宽度容器，避免移动端 max-width:96% 导致截断
+    const wrapper = document.createElement('div');
+    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:420px;z-index:-1;overflow:visible;visibility:hidden;';
+    document.body.appendChild(wrapper);
+
+    const clone = paper.cloneNode(true);
+    const cloneId = 'receipt-export-clone-' + Date.now();
+    clone.id = cloneId;
+    clone.style.cssText = 'width:400px;max-width:none;margin:0;transform:none;animation:none;position:relative;box-shadow:none;overflow:visible;';
+
+    // 移除导出时不需要的 UI
+    const closeBtn = clone.querySelector('.receipt-close');
+    const actions = clone.querySelector('.receipt-actions');
+    if (closeBtn) closeBtn.remove();
+    if (actions) actions.remove();
+
+    // 注入覆盖样式：禁止任何截断、省略，确保内容完整
+    const overrideStyle = document.createElement('style');
+    overrideStyle.textContent = `
+      #${cloneId} .receipt-row-label,
+      #${cloneId} .receipt-row-value,
+      #${cloneId} .receipt-music-name,
+      #${cloneId} .receipt-music-artist,
+      #${cloneId} .receipt-music-lyric,
+      #${cloneId} .receipt-review,
+      #${cloneId} .receipt-thanks,
+      #${cloneId} .receipt-foot {
+        max-width: none !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        white-space: normal !important;
+        flex-shrink: 0 !important;
+      }
+      #${cloneId} .receipt-row-data {
+        flex-wrap: wrap !important;
+        gap: 2px 8px !important;
+      }
+      #${cloneId} .receipt-row-value {
+        margin-left: auto !important;
+      }
+      #${cloneId} .receipt-row-dots {
+        flex: 1 1 auto !important;
+        min-width: 12px !important;
+      }
+    `;
+
+    wrapper.appendChild(overrideStyle);
+    wrapper.appendChild(clone);
 
     try {
-      const dataUrl = await domtoimage.toPng(paper, {
+      const dataUrl = await domtoimage.toPng(clone, {
         bgcolor: '#ffffff',
         scale: 2,
+        width: 400,
+        height: clone.scrollHeight,
         style: { margin: '0' }
       });
       const date = (this._currentReceiptMusic && this._currentReceiptMusic.date) || this.todayStr();
@@ -1435,8 +1486,7 @@ class TaskApp {
       console.error('导出小票失败', err);
       alert('导出图片失败：' + (err && err.message ? err.message : '未知错误'));
     } finally {
-      if (closeBtn) closeBtn.style.display = prevClose;
-      if (actions) actions.style.display = prevActions;
+      if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
     }
   }
 
@@ -1518,6 +1568,20 @@ class TaskApp {
     return `${NCM_CACHE_KEY}:${date || this.todayStr()}`;
   }
 
+  // 按日期记录手动换歌次数（用于生成不同种子）
+  _ncmOffsetKey(date) {
+    return `${NCM_OFFSET_KEY}:${date || this.todayStr()}`;
+  }
+  _getSongOffset(date) {
+    try {
+      const v = parseInt(localStorage.getItem(this._ncmOffsetKey(date)) || '0', 10);
+      return isNaN(v) ? 0 : Math.max(0, v);
+    } catch (e) { return 0; }
+  }
+  _setSongOffset(date, offset) {
+    try { localStorage.setItem(this._ncmOffsetKey(date), String(offset)); } catch (e) {}
+  }
+
   // 清空所有日期的歌曲缓存（换 UID 时调用）
   _clearAllNcmCache() {
     try {
@@ -1550,8 +1614,12 @@ class TaskApp {
           }
           return null;
         }
-        // 用日期+UID做种子，保证不同日期歌曲不同且可复现
-        const seed = hashString(this.ncmUid + '|' + targetDate);
+        // 用日期+UID+offset做种子，offset=0 时与旧逻辑一致
+        const offset = this._getSongOffset(targetDate);
+        const seedStr = offset > 0
+          ? this.ncmUid + '|' + targetDate + '|' + offset
+          : this.ncmUid + '|' + targetDate;
+        const seed = hashString(seedStr);
         const picked = data.list[seed % data.list.length];
         song = { id: picked.id, name: picked.name, artist: picked.artist, coverUrl: picked.coverUrl, lyric: '' };
         try { localStorage.setItem(cacheKey, JSON.stringify({ date: targetDate, uid: this.ncmUid, song })); } catch (e) {}
@@ -1572,6 +1640,15 @@ class TaskApp {
       } catch (e) { /* 歌词获取失败不影响封面展示 */ }
     }
     return song;
+  }
+
+  // 手动换一首：增加 offset，清除当天缓存并重新渲染
+  async refreshSongOfDay(date) {
+    const targetDate = date || this.todayStr();
+    const offset = this._getSongOffset(targetDate) + 1;
+    this._setSongOffset(targetDate, offset);
+    try { localStorage.removeItem(this._ncmCacheKey(targetDate)); } catch (e) {}
+    await this.renderReceiptMusic(targetDate);
   }
 
   pixelateCover(proxiedUrl, size = 80) {
@@ -1648,6 +1725,7 @@ class TaskApp {
         <div class="receipt-music-name">${this.escapeHtml(song.name)}</div>
         <div class="receipt-music-artist">${this.escapeHtml(song.artist)}</div>
       </div>
+      <button type="button" class="receipt-music-refresh" onclick="app.refreshSongOfDay('${date || this.todayStr()}')" title="换一首">↻ 换一首</button>
       ${lyricHtml}`;
     // 音乐加载完后刷新收藏按钮状态（因为可能已经生成像素封面）
     this._updateReceiptFavoriteButtons(date || this.todayStr());
