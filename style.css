@@ -2543,14 +2543,38 @@ input::placeholder, textarea::placeholder {
   font-size: 9px;
   padding: 5px 0;
 }
+.receipt-row-sub .receipt-row-num {
+  font-family: var(--font-pixel);
+  font-size: 8px;
+  color: #666;
+  min-width: 18px;
+  text-align: left;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
 .receipt-row-sub .receipt-row-label {
-  max-width: 120px;
+  max-width: 110px;
 }
 .receipt-row-sub .receipt-row-dots {
   border-bottom-width: 1px;
 }
 .receipt-row-sub .receipt-row-value {
   font-size: 9px;
+}
+
+.receipt-totals {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px dashed #b9b3a4;
+}
+.receipt-totals .receipt-total-row {
+  padding: 4px 0;
+}
+.receipt-totals .receipt-row-label {
+  font-weight: 600;
+}
+.receipt-totals .receipt-row-value {
+  font-weight: 600;
 }
 
 .receipt-summary {
