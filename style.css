@@ -2470,6 +2470,25 @@ input::placeholder, textarea::placeholder {
   font-style: italic;
 }
 
+.receipt-music-refresh {
+  display: block;
+  margin: 8px auto 4px;
+  padding: 4px 10px;
+  border: 1px dashed #666;
+  background: transparent;
+  color: #444;
+  font-family: var(--font-pixel);
+  font-size: 9px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all 0.15s;
+}
+.receipt-music-refresh:hover {
+  background: #f4f4f4;
+  color: #000;
+  border-color: #000;
+}
+
 .receipt-row-data {
   display: flex;
   align-items: baseline;
@@ -2488,7 +2507,7 @@ input::placeholder, textarea::placeholder {
 .receipt-row-label {
   font-weight: 400;
   flex-shrink: 0;
-  max-width: 140px;
+  max-width: 220px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2555,7 +2574,7 @@ input::placeholder, textarea::placeholder {
   margin-right: 4px;
 }
 .receipt-row-sub .receipt-row-label {
-  max-width: 110px;
+  max-width: 170px;
 }
 .receipt-row-sub .receipt-row-dots {
   border-bottom-width: 1px;
@@ -2602,7 +2621,7 @@ input::placeholder, textarea::placeholder {
 .receipt-undone .receipt-row-label {
   color: #555;
   font-style: italic;
-  max-width: 110px;
+  max-width: 170px;
 }
 .receipt-undone .receipt-row-value {
   min-width: 0;
