@@ -1459,7 +1459,7 @@ class TaskApp {
     return `<svg class="receipt-barcode-svg" viewBox="0 0 300 46" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
   }
 
-  // ===== 小票收藏夹 / 托盘 =====
+  // ===== 小票收藏夹 / 托盘（竖向立体堆叠） =====
   renderReceiptView() {
     const tray = document.getElementById('receipt-tray');
     const empty = document.getElementById('receipt-tray-empty');
@@ -1471,75 +1471,199 @@ class TaskApp {
       return;
     }
     empty.style.display = 'none';
-    tray.innerHTML = list.map((r, idx) => {
-      const d = new Date(r.date);
-      const mm = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      const title = r.songName || r.pattern || 'RECEIPT';
-      const artist = r.artist || '';
-      // 兼容旧数据：没有 pixelUrl 时回退到旧的 generatePixelArt
-      let imgUrl = r.pixelUrl;
-      if (!imgUrl && r.pattern) {
-        const legacy = generatePixelArt(r.date);
-        imgUrl = legacy.dataUrl;
+    tray.innerHTML = '';
+    list.forEach((r, idx) => {
+      tray.appendChild(this._createReceiptCard(r, idx));
+    });
+    this._layoutReceiptCards();
+  }
+
+  _createReceiptCard(r, idx) {
+    const d = new Date(r.date);
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    const title = r.songName || r.pattern || 'RECEIPT';
+    const artist = r.artist || '';
+    // 兼容旧数据：没有 pixelUrl 时回退到旧的 generatePixelArt
+    let imgUrl = r.pixelUrl;
+    if (!imgUrl && r.pattern) {
+      const legacy = generatePixelArt(r.date);
+      imgUrl = legacy.dataUrl;
+    }
+    const div = document.createElement('div');
+    div.className = 'receipt-card';
+    div.dataset.date = r.date;
+    div.dataset.idx = idx;
+    div.innerHTML = `
+      <div class="receipt-card-date">${mm}.${dd}</div>
+      <img class="receipt-card-img" src="${imgUrl || ''}" alt="${this.escapeHtml(title)}" draggable="false" />
+      <div class="receipt-card-title">${this.escapeHtml(title)}</div>
+      ${artist ? `<div class="receipt-card-artist">${this.escapeHtml(artist)}</div>` : ''}
+    `;
+    this._bindReceiptPointerEvents(div);
+    return div;
+  }
+
+  _layoutReceiptCards() {
+    const tray = document.getElementById('receipt-tray');
+    const cards = [...tray.querySelectorAll('.receipt-card')];
+    const count = cards.length;
+    const trayHeight = tray.clientHeight;
+    const baseBottom = 22;
+    // 动态步长：票越多，每张露出的边缘越少
+    const stepY = Math.min(30, Math.max(16, (trayHeight - 240) / Math.max(count, 1)));
+    cards.forEach((card, idx) => {
+      const seed = this._hashString(card.dataset.date || String(idx));
+      const rot = ((seed % 900) / 100) - 4.5; // -4.5 ~ 4.5 deg
+      const tx = ((seed % 700) / 100) - 3.5;  // -3.5 ~ 3.5 px
+      const bottom = baseBottom + idx * stepY;
+      card.style.left = '50%';
+      card.style.marginLeft = '-94px';
+      card.style.bottom = `${bottom}px`;
+      card.style.top = 'auto';
+      card.style.transform = `translateX(${tx}px) rotate(${rot}deg)`;
+      card.style.zIndex = idx + 1;
+    });
+  }
+
+  _hashString(str) {
+    let h = 2166136261;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = Math.imul(h, 16777619);
+    }
+    return Math.abs(h);
+  }
+
+  _bindReceiptPointerEvents(card) {
+    card.addEventListener('pointerdown', (e) => this._onReceiptPointerDown(e, card));
+  }
+
+  _onReceiptPointerDown(e, card) {
+    // 只响应主指针/触摸，避免右键菜单
+    if (e.button !== 0) return;
+    e.preventDefault();
+    e.stopPropagation();
+    card.setPointerCapture(e.pointerId);
+    const tray = document.getElementById('receipt-tray');
+    const rect = card.getBoundingClientRect();
+    const trayRect = tray.getBoundingClientRect();
+    this._receiptDrag = {
+      card,
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startTime: Date.now(),
+      offsetX: e.clientX - rect.left,
+      offsetY: e.clientY - rect.top,
+      trayRect,
+      dragging: false,
+      moved: false
+    };
+    // 180ms 后如果还没松开也没有大幅移动，就进入拖拽状态（给一点触觉反馈）
+    this._receiptDrag.longPressTimer = setTimeout(() => {
+      if (this._receiptDrag && this._receiptDrag.card === card && !this._receiptDrag.dragging) {
+        this._startReceiptDrag(card);
       }
-      return `
-        <div class="receipt-card" draggable="true" data-date="${r.date}" data-idx="${idx}"
-             ondragstart="app.dragReceipt(event, '${r.date}')"
-             ondragend="app.endDragReceipt(event)"
-             onclick="app.openReceipt('${r.date}')">
-          <div class="receipt-card-date">${mm}.${dd}</div>
-          <img class="receipt-card-img" src="${imgUrl || ''}" alt="${this.escapeHtml(title)}" />
-          <div class="receipt-card-title">${this.escapeHtml(title)}</div>
-          ${artist ? `<div class="receipt-card-artist">${this.escapeHtml(artist)}</div>` : ''}
-        </div>
-      `;
-    }).join('');
+    }, 180);
+
+    const moveHandler = (ev) => this._onReceiptPointerMove(ev, card);
+    const upHandler = (ev) => this._onReceiptPointerUp(ev, card, moveHandler, upHandler);
+    card.addEventListener('pointermove', moveHandler);
+    card.addEventListener('pointerup', upHandler);
+    card.addEventListener('pointercancel', upHandler);
   }
 
-  dragReceipt(e, date) {
-    this._dragReceiptDate = date;
-    e.dataTransfer.effectAllowed = 'move';
-    const card = e.target.closest('.receipt-card');
-    if (card) card.classList.add('dragging');
+  _onReceiptPointerMove(e, card) {
+    const drag = this._receiptDrag;
+    if (!drag || drag.card !== card || e.pointerId !== drag.pointerId) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    const dist = Math.hypot(dx, dy);
+    if (!drag.dragging && dist > 10) {
+      clearTimeout(drag.longPressTimer);
+      this._startReceiptDrag(card);
+    }
+    if (drag.dragging) {
+      drag.moved = true;
+      const x = e.clientX - drag.trayRect.left - drag.offsetX;
+      const y = e.clientY - drag.trayRect.top - drag.offsetY;
+      card.style.left = `${x}px`;
+      card.style.marginLeft = '0';
+      card.style.bottom = 'auto';
+      card.style.top = `${y}px`;
+      // 拖拽时立体浮起：放大、抬升、稍微跟随水平偏移旋转
+      const rot = (dx * 0.03);
+      card.style.transform = `scale(1.10) translateZ(70px) rotateX(5deg) rotate(${rot}deg)`;
+      card.style.zIndex = '10000';
+    }
   }
 
-  endDragReceipt(e) {
-    const card = e.target.closest('.receipt-card');
-    if (card) card.classList.remove('dragging');
-    delete this._dragReceiptDate;
+  _startReceiptDrag(card) {
+    const drag = this._receiptDrag;
+    if (!drag) return;
+    drag.dragging = true;
+    card.classList.add('lifted');
+    if (navigator.vibrate) navigator.vibrate(12);
   }
 
-  allowDropReceipt(e) {
-    e.preventDefault();
+  _onReceiptPointerUp(e, card, moveHandler, upHandler) {
+    const drag = this._receiptDrag;
+    if (!drag || drag.card !== card || e.pointerId !== drag.pointerId) return;
+    clearTimeout(drag.longPressTimer);
+    card.removeEventListener('pointermove', moveHandler);
+    card.removeEventListener('pointerup', upHandler);
+    card.removeEventListener('pointercancel', upHandler);
+    try { card.releasePointerCapture(e.pointerId); } catch (err) {}
+
+    const duration = Date.now() - drag.startTime;
+    const dist = Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY);
+
+    if (!drag.dragging && dist < 10 && duration < 320) {
+      // 轻点：打开当天小票
+      card.classList.add('tapped');
+      setTimeout(() => card.classList.remove('tapped'), 220);
+      this.openReceipt(card.dataset.date);
+    } else if (drag.dragging) {
+      this._finishReceiptDrag(card, e.clientX, e.clientY);
+    }
+    this._receiptDrag = null;
+  }
+
+  _finishReceiptDrag(card, clientX, clientY) {
     const tray = document.getElementById('receipt-tray');
-    if (!tray) return;
-    const after = this._getDragAfterElement(tray, e.clientX, e.clientY);
-    const dragging = tray.querySelector('.dragging');
-    if (!dragging) return;
-    if (after == null) tray.appendChild(dragging);
-    else tray.insertBefore(dragging, after);
-  }
-
-  _getDragAfterElement(container, x, y) {
-    const cards = [...container.querySelectorAll('.receipt-card:not(.dragging)')];
-    return cards.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offsetX = x - box.left - box.width / 2;
-      const offsetY = y - box.top - box.height / 2;
-      const dist = offsetX * offsetX + offsetY * offsetY;
-      if (dist < closest.dist) return { dist, offsetX, offsetY, element: child };
-      return closest;
-    }, { dist: Number.POSITIVE_INFINITY }).element;
-  }
-
-  dropReceipt(e) {
-    e.preventDefault();
-    const tray = document.getElementById('receipt-tray');
-    if (!tray || !this._dragReceiptDate) return;
-    const order = [...tray.querySelectorAll('.receipt-card')].map(c => c.dataset.date);
+    const trayRect = tray.getBoundingClientRect();
+    const draggedDate = card.dataset.date;
     const map = new Map(this.receipts.map(r => [r.date, r]));
-    this.receipts = order.map(date => map.get(date)).filter(Boolean);
+    const dragged = map.get(draggedDate);
+    if (!dragged) return;
+
+    // 找到落点中心最近的其他卡片
+    const others = [...tray.querySelectorAll('.receipt-card')].filter(c => c !== card);
+    let target = null;
+    let minDist = Number.POSITIVE_INFINITY;
+    others.forEach(c => {
+      const box = c.getBoundingClientRect();
+      const cx = box.left + box.width / 2;
+      const cy = box.top + box.height / 2;
+      const d = Math.hypot(clientX - cx, clientY - cy);
+      if (d < minDist) { minDist = d; target = c; }
+    });
+
+    let newList = this.receipts.filter(r => r.date !== draggedDate);
+    if (target && target.dataset.date && minDist < 160) {
+      // 落到某张票上：叠到它上面
+      const targetIdx = newList.findIndex(r => r.date === target.dataset.date);
+      if (targetIdx >= 0) newList.splice(targetIdx + 1, 0, dragged);
+      else newList.push(dragged);
+    } else {
+      // 按落点的 Y 坐标插入排序
+      const relY = clientY - trayRect.top;
+      const stepY = Math.min(30, Math.max(16, (trayRect.height - 240) / Math.max(newList.length, 1)));
+      const insertIdx = Math.max(0, Math.min(newList.length, Math.floor((relY - 30) / stepY)));
+      newList.splice(insertIdx, 0, dragged);
+    }
+    this.receipts = newList;
     this.receipts.forEach((r, i) => r.order = i);
     this.saveData();
     this.renderReceiptView();

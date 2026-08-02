@@ -276,11 +276,14 @@
 
     <section class="receipt-view" id="receipt-view" style="display: none;">
       <div class="receipt-view-header">
-        <h2 class="receipt-view-title">🧾 小票收藏夹</h2>
-        <p class="receipt-view-sub">每天生成的小票会落在这里，长按/拖拽可以重新排序</p>
+        <h2 class="receipt-view-title">🧾 小票托盘</h2>
+        <p class="receipt-view-sub">收藏的小票会叠在这里，按住一张可以拖起来，放到别的票上重新叠放</p>
       </div>
-      <div class="receipt-tray" id="receipt-tray" ondrop="app.dropReceipt(event)" ondragover="app.allowDropReceipt(event)">
-        <!-- receipt cards injected by JS -->
+      <div class="receipt-tray-outer">
+        <div class="receipt-tray" id="receipt-tray">
+          <!-- receipt cards injected by JS -->
+        </div>
+        <div class="receipt-tray-base"></div>
       </div>
       <div class="receipt-tray-empty" id="receipt-tray-empty" style="display:none;">
         还没有小票～完成一件事后去「今日待办」点 🧾 今日小票 生成一张吧
@@ -595,6 +598,6 @@
   </div>
 
   <script src="supabase.umd.js"></script>
-  <script src="app.js?v=21"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>
