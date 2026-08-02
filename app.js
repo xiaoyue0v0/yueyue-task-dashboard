@@ -1061,6 +1061,125 @@ class TaskApp {
   }
 
   // ===== 每日小票 =====
+
+  // 根据当天实际完成内容生成一句综合点评（非固定预设，随任务构成变化）
+  generateDailyReview(date, { routineDone, limitedDone, subDone, poopDone, skincareItems, rate, totalItems }) {
+    const seed = hashString(date + '|' + (totalItems || 0) + '|' + (rate || 0));
+    const pick = (arr, salt = 0) => arr[(seed + salt) % arr.length];
+
+    const cats = [];
+    if (routineDone.length) cats.push('每日必做');
+    if (limitedDone.length) cats.push('今日限定');
+    if (subDone.length) cats.push('子任务');
+    if (poopDone) cats.push('拉粑粑');
+    if (skincareItems.length) cats.push('护肤');
+
+    if (cats.length === 0) {
+      return pick([
+        '今天还没有留下任何完成记录。哪怕只做一件小事，这张小票也会更有分量。',
+        '今日暂无完成项，但空白也是记录的一部分。明天从一个微小动作开始吧。',
+        '今天的小票暂时是空白的——给自己一个起点，明天就会顺利很多。'
+      ]);
+    }
+
+    // 第一句：基于完成率/数量的开场
+    let first = '';
+    if (rate >= 100) {
+      first = pick([
+        '今日完成率 100%，所有事项都顺利打勾，状态拉满。',
+        '全部任务清空！今天的执行力值得这张完整的小票。',
+        '100% 完成——今天的节奏很舒服，继续保持。'
+      ]);
+    } else if (rate >= 70) {
+      first = pick([
+        `今天完成了 ${rate}% 的任务，节奏不错，大部分目标都已落地。`,
+        `完成率 ${rate}%，主要事项都推进了，剩下的交给明天。`,
+        `今日进度 ${rate}%，稳扎稳打，已经赢下大部分。`
+      ]);
+    } else if (rate >= 40) {
+      first = pick([
+        `今天完成了 ${rate}% 的任务，有推进也有留白，明天补上。`,
+        `完成率 ${rate}%，做了该做的，也还有空间可以继续。`,
+        `今日进度 ${rate}%——不必着急，每一步都算数。`
+      ]);
+    } else if (totalItems > 0) {
+      first = pick([
+        `今天完成了 ${totalItems} 件事，虽然不多，但已经开始。`,
+        `今日先拿下 ${totalItems} 项，小有进展就是好信号。`,
+        `完成了 ${totalItems} 件事，先动起来，后面会越来越顺。`
+      ]);
+    } else {
+      first = pick([
+        '今天还没留下完成记录，哪怕一件小事也值得被记录。',
+        '今日暂无完成项，给自己一个最小行动，明天再来开票。',
+        '今天的小票还是空白的，但从现在开始也不晚。'
+      ]);
+    }
+
+    // 第二句：从「分类概览 / 具体任务 / 特殊组合」中选一个
+    const notableTasks = [
+      ...routineDone.map(i => i.title),
+      ...limitedDone.map(i => i.title),
+      ...subDone.map(s => s.title)
+    ];
+
+    const secondOptions = [];
+
+    // 分类概览
+    if (cats.length === 1) {
+      secondOptions.push(
+        `其中「${cats[0]}」有记录，是今天的主力。`,
+        `今天的亮点在${cats[0]}这一项。`,
+        `${cats[0]}是今日唯一留下痕迹的板块。`
+      );
+    } else if (cats.length === 2) {
+      secondOptions.push(
+        `${cats.join('和')}都留下了记录，分布很均衡。`,
+        `今天在${cats[0]}、${cats[1]}上都有动作。`,
+        `${cats.join('、')}两个板块都打卡了。`
+      );
+    } else if (cats.length >= 3) {
+      secondOptions.push(
+        `${cats.slice(0, -1).join('、')}和${cats[cats.length - 1]}都有涉及，今天很丰富。`,
+        `多个板块都有进展：${cats.join('、')}。`,
+        `今天横跨${cats.join('、')}，是一张内容很满的小票。`
+      );
+    }
+
+    // 具体任务点名
+    if (notableTasks.length) {
+      const task = notableTasks[seed % notableTasks.length];
+      secondOptions.push(
+        `尤其「${task}」这项值得标记一下。`,
+        `其中「${task}」的完成让今天更扎实。`,
+        `「${task}」这项落袋，是今天的一个小胜利。`
+      );
+    }
+
+    // 特殊组合
+    if (skincareItems.length >= 2) {
+      secondOptions.push(
+        `护肤连续记录了 ${skincareItems.length} 项，状态在线。`,
+        `今天护肤很认真，${skincareItems.length} 项都照顾到了。`
+      );
+    }
+    if (poopDone && skincareItems.length) {
+      secondOptions.push(
+        '身体管理和护肤都照顾到，是认真生活的一天。',
+        '护肤和拉粑粑都记录了，基础护理到位。'
+      );
+    }
+    if (routineDone.length && limitedDone.length && !subDone.length && !skincareItems.length && !poopDone) {
+      secondOptions.push(
+        '日常和限时任务都推进了，结构很清晰。',
+        '基础任务和限定任务都没落下，节奏稳。'
+      );
+    }
+
+    const second = secondOptions.length ? pick(secondOptions, 7) : '';
+    return second ? `${first} ${second}` : first;
+  }
+
   openReceipt(dateOverride) {
     const date = dateOverride || this.todayViewDate;
     const today = this.todayStr();
@@ -1151,6 +1270,11 @@ class TaskApp {
     document.getElementById('receipt-body').innerHTML = itemsHtml;
     document.getElementById('receipt-count').textContent = totalItems;
     document.getElementById('receipt-rate').textContent = rate + '%';
+
+    const review = this.generateDailyReview(date, { routineDone, limitedDone, subDone, poopDone: !!poopDone, skincareItems, rate, totalItems });
+    const reviewEl = document.getElementById('receipt-review');
+    if (reviewEl) reviewEl.textContent = review;
+
     document.getElementById('receipt-barcode').innerHTML = this.barcodeSvg(date);
     document.getElementById('receipt-modal').style.display = 'flex';
     // 播放打印音效
