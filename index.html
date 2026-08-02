@@ -276,17 +276,40 @@
 
     <section class="receipt-view" id="receipt-view" style="display: none;">
       <div class="receipt-view-header">
-        <h2 class="receipt-view-title">🧾 小票托盘</h2>
-        <p class="receipt-view-sub">收藏的小票会叠在这里，按住一张可以拖起来，放到别的票上重新叠放</p>
-      </div>
-      <div class="receipt-tray-outer">
-        <div class="receipt-tray" id="receipt-tray">
-          <!-- receipt cards injected by JS -->
+        <h2 class="receipt-view-title">🧾 小票收藏夹</h2>
+        <div class="receipt-tabs">
+          <button class="receipt-tab active" id="receipt-tab-week" onclick="app.switchReceiptTab('week')">本周小票</button>
+          <button class="receipt-tab" id="receipt-tab-all" onclick="app.switchReceiptTab('all')">所有小票</button>
         </div>
-        <div class="receipt-tray-base"></div>
       </div>
-      <div class="receipt-tray-empty" id="receipt-tray-empty" style="display:none;">
-        还没有小票～完成一件事后去「今日待办」点 🧾 今日小票 生成一张吧
+
+      <div class="receipt-panel" id="receipt-panel-week">
+        <p class="receipt-view-sub">本周收藏的小票，按住一张可以拖起来，放到别的票上重新叠放</p>
+        <div class="receipt-tray-outer">
+          <div class="receipt-tray" id="receipt-tray">
+            <!-- receipt strips injected by JS -->
+          </div>
+          <div class="receipt-tray-base"></div>
+        </div>
+        <div class="receipt-tray-empty" id="receipt-tray-empty" style="display:none;">
+          本周还没有收藏的小票～去「今日待办」点 🧾 今日小票 生成一张吧
+        </div>
+      </div>
+
+      <div class="receipt-panel" id="receipt-panel-all" style="display:none;">
+        <p class="receipt-view-sub">所有收藏的小票，点击日期查看详情</p>
+        <div class="receipt-cal-nav">
+          <button class="receipt-cal-btn" onclick="app.shiftReceiptCal(-1)" aria-label="上个月">‹</button>
+          <div class="receipt-cal-label" id="receipt-cal-label"></div>
+          <button class="receipt-cal-btn" onclick="app.shiftReceiptCal(1)" aria-label="下个月">›</button>
+        </div>
+        <div class="receipt-calendar">
+          <div class="receipt-cal-weekdays" id="receipt-cal-weekdays"></div>
+          <div class="receipt-cal-grid" id="receipt-cal-grid"></div>
+        </div>
+        <div class="receipt-tray-empty" id="receipt-cal-empty" style="display:none;">
+          还没有收藏任何小票～完成一件事后去「今日待办」点 🧾 今日小票 生成一张吧
+        </div>
       </div>
     </section>
   </div>
@@ -598,6 +621,6 @@
   </div>
 
   <script src="supabase.umd.js"></script>
-  <script src="app.js?v=22"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>
