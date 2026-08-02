@@ -4,7 +4,8 @@
 //
 // 端点：
 //   GET /.netlify/functions/ncm?uid=XXXX
-// 返回：{ ok, playlistId, count, list:[{id,name,artist,coverUrl}] }
+// 返回：{ ok, playlistId, count, list:[{id,name,artist,coverUrl,lyrics?}] }
+//   其中 lyrics 是随机一句有效歌词（没有则返回空字符串）
 //
 // 后端地址可配：在 Netlify 控制台设置环境变量 NCM_API_BASE 指向你自己部署的 NeteaseCloudMusicApi。
 // 不再默认使用任何公开第三方实例（它们经常失效/限流）。
@@ -58,6 +59,50 @@ function normalizeSong(song) {
   };
 }
 
+function parseLrc(lrcText) {
+  if (!lrcText) return [];
+  return lrcText
+    .split('\n')
+    .map(line => {
+      // [00:00.000] 歌词内容
+      const m = line.replace(/\[[^\]]+\]/g, '').trim();
+      return m;
+    })
+    .filter(line => {
+      if (!line) return false;
+      // 过滤 instrumental / 纯音乐 / 作词 / 作曲 / 编曲等元信息
+      const low = line.toLowerCase();
+      const bad = /^(作词|作曲|编曲|制作人|监制|出品|纯音乐|instrumental|歌词|词：|曲：|编：|\d+\s*分|网易|云音乐|版权所有|翻译|校对|制作)/;
+      if (bad.test(line)) return false;
+      if (low.includes('instrumental')) return false;
+      if (low.includes('纯音乐')) return false;
+      if (/^\d+$/.test(line)) return false;
+      if (line.length < 3) return false;
+      return true;
+    });
+}
+
+function pickRandomLine(lines, seedStr) {
+  if (!lines || lines.length === 0) return '';
+  let h = 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = (h * 31 + seedStr.charCodeAt(i)) >>> 0;
+  }
+  const idx = h % lines.length;
+  return lines[idx];
+}
+
+async function fetchLyric(songId, seedStr) {
+  try {
+    const { data } = await ncmGet('/lyric', 'id=' + encodeURIComponent(songId));
+    const raw = (data && (data.lrc && data.lrc.lyric)) || data.lyric || '';
+    const lines = parseLrc(raw);
+    return pickRandomLine(lines, seedStr) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
 exports.handler = async (event) => {
   if (!NCM_API_BASE) {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: '未配置 NCM_API_BASE', hint: '请在 Netlify 控制台 Site settings → Environment variables 添加 NCM_API_BASE，指向你自己部署的 NeteaseCloudMusicApi 地址（例如 https://xxx.vercel.app）' }) };
@@ -69,11 +114,13 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: '缺少 uid 参数' }) };
   }
 
-  const cached = cache.get(uid);
-  const now = Date.now();
-  if (cached && now - cached.ts < 3600 * 1000) {
-    return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, cached: true, count: cached.list.length, list: cached.list }) };
-  }
+    const cached = cache.get(uid);
+    const now = Date.now();
+    if (cached && now - cached.ts < 3600 * 1000) {
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, cached: true, count: cached.list.length, list: cached.list }) };
+    }
+
+    const todayStr = new Date().toISOString().slice(0, 10);
 
   try {
     // 1) 获取该用户的歌单列表，筛出本人创建的，再找「我喜欢的音乐」(specialType === 5)
@@ -92,10 +139,19 @@ exports.handler = async (event) => {
     // 2) 拉歌单全部曲目（最多 1000 首）
     const { status: ts, data: tr } = await ncmGet('/playlist/track/all', 'id=' + encodeURIComponent(liked.id) + '&limit=1000&offset=0');
     const songs = tr.songs || (tr.playlist && tr.playlist.tracks) || [];
-    const list = songs.map(normalizeSong).filter(s => s.coverUrl);
+    let list = songs.map(normalizeSong).filter(s => s.coverUrl);
     if (list.length === 0) {
       return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: '歌单里没有可读取的歌曲', hint: '可能是「我喜欢的音乐」设为私密或为空' }) };
     }
+
+    // 3) 为每首歌补一句歌词（按歌曲 id+日期种子随机选一句）；失败时 lyric 为空，不阻塞。
+    const lyricSeedBase = uid + '|' + todayStr;
+    list = await Promise.all(
+      list.map(async (song) => {
+        const lyric = await fetchLyric(song.id, lyricSeedBase + '|' + song.id);
+        return { ...song, lyric };
+      })
+    );
 
     cache.set(uid, { ts: now, list });
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, playlistId: liked.id, count: list.length, list }) };

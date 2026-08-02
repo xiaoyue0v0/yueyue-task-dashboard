@@ -1094,24 +1094,6 @@ class TaskApp {
     const enMonth = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     const orderId = `${yyyy}${mm}${dd}`;
 
-    // 每天一张像素图：有缓存用缓存，没缓存生成并保存
-    let cached = this.receipts.find(r => r.date === date);
-    if (!cached || !cached.pixelUrl) {
-      const pixel = generatePixelArt(date);
-      cached = {
-        date,
-        createdAt: new Date().toISOString(),
-        pattern: pixel.pattern,
-        pixelUrl: pixel.dataUrl,
-        order: this.receipts.length
-      };
-      const idx = this.receipts.findIndex(r => r.date === date);
-      if (idx >= 0) this.receipts[idx] = cached;
-      else this.receipts.unshift(cached);
-      this.persistLocal();
-      this._dirty = true;
-      this.schedulePush();
-    }
     this._viewingReceiptDate = date;
 
     // 数据行：左侧分类，右侧数值（像视频里 Messages handled / Meeting hours 那样）
@@ -1144,15 +1126,13 @@ class TaskApp {
     document.getElementById('receipt-date-label').textContent = `Daily Receipt ${mmddDash}`;
     document.getElementById('receipt-meta-weekday').textContent = `${enWeekdays[dateObj.getDay()]}, ${enMonth[dateObj.getMonth()]} ${dateObj.getDate()}, ${yyyy}`;
     document.getElementById('receipt-meta-order').textContent = 'ORDER ' + orderId;
-    document.getElementById('receipt-hero-img').src = cached.pixelUrl;
-    document.getElementById('receipt-hero-img').alt = cached.pattern || 'pixel art';
     document.getElementById('receipt-date').textContent = dateLabel + (isToday ? ' · 今日' : '');
     document.getElementById('receipt-body').innerHTML = itemsHtml;
     document.getElementById('receipt-count').textContent = totalItems;
     document.getElementById('receipt-rate').textContent = rate + '%';
     document.getElementById('receipt-barcode').innerHTML = this.barcodeSvg(date);
     document.getElementById('receipt-modal').style.display = 'flex';
-    // 异步加载「今日歌曲」像素封面（不阻塞小票弹出）
+    // 异步加载「今日歌曲」封面 + 歌词（不阻塞小票弹出）
     this.renderReceiptMusic(date);
   }
 
@@ -1223,7 +1203,7 @@ class TaskApp {
       }
       const seed = hashString(this.ncmUid + '|' + today);
       const song = data.list[seed % data.list.length];
-      const result = { name: song.name, artist: song.artist, coverUrl: song.coverUrl };
+      const result = { name: song.name, artist: song.artist, coverUrl: song.coverUrl, lyric: song.lyric || '' };
       try { localStorage.setItem(NCM_CACHE_KEY, JSON.stringify({ date: today, uid: this.ncmUid, song: result })); } catch (e) {}
       return result;
     } catch (e) {
@@ -1232,19 +1212,35 @@ class TaskApp {
     }
   }
 
-  pixelateCover(proxiedUrl, size = 30) {
+  pixelateCover(proxiedUrl, size = 48) {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         try {
+          // 1) 缩到像素网格，用灰度+对比度增强营造更清晰的黑白像素
           const small = document.createElement('canvas');
           small.width = size; small.height = size;
           const sctx = small.getContext('2d');
           sctx.imageSmoothingEnabled = false;
           sctx.drawImage(img, 0, 0, size, size);
+          const px = sctx.getImageData(0, 0, size, size);
+          const d = px.data;
+          for (let i = 0; i < d.length; i += 4) {
+            const r = d[i], g = d[i + 1], b = d[i + 2];
+            // 灰度
+            let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+            // 提升对比度
+            gray = (gray - 128) * 1.25 + 128;
+            // 阈值：纯黑白二值化
+            const v = gray > 145 ? 245 : 18;
+            d[i] = d[i + 1] = d[i + 2] = v;
+          }
+          sctx.putImageData(px, 0, 0);
+
+          // 2) 近邻放大到目标尺寸
           const out = document.createElement('canvas');
-          const scale = 4;
+          const scale = 6;
           out.width = size * scale; out.height = size * scale;
           const octx = out.getContext('2d');
           octx.imageSmoothingEnabled = false;
@@ -1264,17 +1260,21 @@ class TaskApp {
     const song = await this.getSongOfDay();
     if (!song) { el.style.display = 'none'; return; }
     const proxied = this.buildProxiedCoverUrl(song.coverUrl);
-    const pixel = await this.pixelateCover(proxied, 30);
+    const pixel = await this.pixelateCover(proxied, 48);
     el.style.display = 'block';
+    const lyricHtml = song.lyric
+      ? `<div class="receipt-music-lyric">“${this.escapeHtml(song.lyric)}”</div>`
+      : '';
     el.innerHTML = `
-      <div class="receipt-music-label">🎵 今日歌曲 / TODAY'S TRACK</div>
-      <div class="receipt-music-body">
+      <div class="receipt-music-label">♫ 今日歌曲 / TODAY'S TRACK</div>
+      <div class="receipt-music-hero">
         <div class="receipt-music-cover">${pixel ? `<img src="${pixel}" alt="cover" />` : ''}</div>
-        <div class="receipt-music-meta">
-          <div class="receipt-music-name">${this.escapeHtml(song.name)}</div>
-          <div class="receipt-music-artist">${this.escapeHtml(song.artist)}</div>
-        </div>
-      </div>`;
+      </div>
+      <div class="receipt-music-meta">
+        <div class="receipt-music-name">${this.escapeHtml(song.name)}</div>
+        <div class="receipt-music-artist">${this.escapeHtml(song.artist)}</div>
+      </div>
+      ${lyricHtml}`;
   }
 
   closeTopModal() {
