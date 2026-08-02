@@ -1096,27 +1096,50 @@ class TaskApp {
 
     this._viewingReceiptDate = date;
 
-    // 数据行：把每一条完成的任务单独列出来；护肤展开成具体项目；拉粑粑和总完成率保留
+    // 数据行：按大标题分组（每日必做 / 今日限定 / 今日子任务 / 拉粑粑记录 / 护肤记录）
     const poopDone = this.poopDates.includes(date) ? 1 : 0;
     const skincareDay = this.skincareDates[date] || {};
-    const rows = [];
-
-    routineDone.forEach(i => rows.push({ label: i.title, value: '✓', tag: 'ROUTINE' }));
-    limitedDone.forEach(i => rows.push({ label: i.title, value: '✓', tag: 'TODAY' }));
-    subDone.forEach(s => rows.push({ label: s.title, value: '✓', tag: 'TASK' }));
+    const skincareItems = [];
     SKINCARE_CATEGORIES.forEach(c => {
-      if (skincareDay[c.key]) rows.push({ label: c.label, value: '✓', tag: 'SKINCARE' });
+      if (skincareDay[c.key]) skincareItems.push({ label: c.label, value: '✓' });
     });
-    rows.push({ label: '拉粑粑记录', value: poopDone ? '✓' : '-' });
-    rows.push({ label: '总完成率', value: rate + '%' });
 
-    const itemsHtml = totalItems === 0 && rows.length <= 2
+    const groups = [];
+    if (routineDone.length) {
+      groups.push({ title: '每日必做', items: routineDone.map(i => ({ label: i.title, value: '✓' })) });
+    }
+    if (limitedDone.length) {
+      groups.push({ title: '今日限定', items: limitedDone.map(i => ({ label: i.title, value: '✓' })) });
+    }
+    if (subDone.length) {
+      groups.push({ title: '今日子任务', items: subDone.map(s => ({ label: s.title, value: '✓' })) });
+    }
+    groups.push({
+      title: '拉粑粑记录',
+      items: [{ label: poopDone ? '已记录' : '未记录', value: poopDone ? '✓' : '-' }]
+    });
+    if (skincareItems.length) {
+      groups.push({ title: '护肤记录', items: skincareItems });
+    }
+
+    const hasAnyActivity = routineDone.length || limitedDone.length || subDone.length || poopDone || skincareItems.length;
+    let d = 0;
+    const nextDelay = () => `${360 + d++ * 60}ms`;
+
+    const itemsHtml = !hasAnyActivity
       ? '<div class="receipt-empty">今日暂无完成记录 🥲<br>做一件小事，再回来开票吧～</div>'
-      : rows.map((r, idx) => `
-        <div class="receipt-row-data" style="animation-delay:${360 + idx * 60}ms">
-          <span class="receipt-row-label">${this.escapeHtml(r.label)}</span>
-          <span class="receipt-row-dots"></span>
-          <span class="receipt-row-value">${r.value}</span>
+      : groups.map(g => `
+        <div class="receipt-group">
+          <div class="receipt-group-title" style="animation-delay:${nextDelay()}">${g.title}</div>
+          <div class="receipt-group-items">
+            ${g.items.map(item => `
+              <div class="receipt-row-data receipt-row-sub" style="animation-delay:${nextDelay()}">
+                <span class="receipt-row-label">${this.escapeHtml(item.label)}</span>
+                <span class="receipt-row-dots"></span>
+                <span class="receipt-row-value">${item.value}</span>
+              </div>
+            `).join('')}
+          </div>
         </div>
       `).join('');
 
