@@ -1225,25 +1225,28 @@ class TaskApp {
 
     const groups = [];
     if (routineDone.length) {
-      groups.push({ title: '每日必做', items: routineDone.map(i => ({ label: i.title, value: '✓' })) });
+      groups.push({ title: '每日必做', items: routineDone.map(i => ({ label: i.title, qty: 1 })) });
     }
     if (limitedDone.length) {
-      groups.push({ title: '今日限定', items: limitedDone.map(i => ({ label: i.title, value: '✓' })) });
+      groups.push({ title: '今日限定', items: limitedDone.map(i => ({ label: i.title, qty: 1 })) });
     }
     if (subDone.length) {
-      groups.push({ title: '今日子任务', items: subDone.map(s => ({ label: s.title, value: '✓' })) });
+      groups.push({ title: '今日子任务', items: subDone.map(s => ({ label: s.title, qty: 1 })) });
     }
     groups.push({
       title: '拉粑粑记录',
-      items: [{ label: poopDone ? '已记录' : '未记录', value: poopDone ? '✓' : '-' }]
+      items: [{ label: poopDone ? '已记录' : '未记录', qty: poopDone ? 1 : 0 }]
     });
     if (skincareItems.length) {
-      groups.push({ title: '护肤记录', items: skincareItems });
+      groups.push({ title: '护肤记录', items: skincareItems.map(i => ({ label: i.label, qty: 1 })) });
     }
 
     const hasAnyActivity = routineDone.length || limitedDone.length || subDone.length || poopDone || skincareItems.length;
     let d = 0;
     const nextDelay = () => `${360 + d++ * 60}ms`;
+    let lineNo = 0;
+    const totalQty = groups.reduce((sum, g) => sum + g.items.reduce((s, i) => s + (i.qty || 0), 0), 0);
+    const totalLines = groups.reduce((sum, g) => sum + g.items.length, 0);
 
     const itemsHtml = !hasAnyActivity
       ? '<div class="receipt-empty">今日暂无完成记录 🥲<br>做一件小事，再回来开票吧～</div>'
@@ -1251,16 +1254,34 @@ class TaskApp {
         <div class="receipt-group">
           <div class="receipt-group-title" style="animation-delay:${nextDelay()}">${g.title}</div>
           <div class="receipt-group-items">
-            ${g.items.map(item => `
+            ${g.items.map(item => {
+              const num = String(++lineNo).padStart(2, '0');
+              const val = item.qty > 0 ? `x${item.qty}` : '-';
+              return `
               <div class="receipt-row-data receipt-row-sub" style="animation-delay:${nextDelay()}">
+                <span class="receipt-row-num">${num}</span>
                 <span class="receipt-row-label">${this.escapeHtml(item.label)}</span>
                 <span class="receipt-row-dots"></span>
-                <span class="receipt-row-value">${item.value}</span>
+                <span class="receipt-row-value">${val}</span>
               </div>
-            `).join('')}
+            `;
+            }).join('')}
           </div>
         </div>
-      `).join('');
+      `).join('') + `
+        <div class="receipt-totals" style="animation-delay:${nextDelay()}">
+          <div class="receipt-row-data receipt-row-sub receipt-total-row">
+            <span class="receipt-row-label">合计项</span>
+            <span class="receipt-row-dots"></span>
+            <span class="receipt-row-value">${totalLines}项</span>
+          </div>
+          <div class="receipt-row-data receipt-row-sub receipt-total-row">
+            <span class="receipt-row-label">合计数量</span>
+            <span class="receipt-row-dots"></span>
+            <span class="receipt-row-value">x${totalQty}</span>
+          </div>
+        </div>
+      `;
 
     document.getElementById('receipt-date-display').textContent = mmdd;
     document.getElementById('receipt-date-label').textContent = `Daily Receipt ${mmddDash}`;
