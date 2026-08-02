@@ -1305,36 +1305,42 @@ class TaskApp {
     const cacheKey = this._ncmCacheKey(targetDate);
     let cache = null;
     try { cache = JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch (e) { cache = null; }
+    let song = null;
     if (cache && cache.date === targetDate && cache.uid === this.ncmUid && cache.song) {
-      return cache.song;
-    }
-    try {
-      const resp = await fetch(`/.netlify/functions/ncm?uid=${encodeURIComponent(this.ncmUid)}`);
-      const data = await resp.json();
-      if (!data.ok || !data.list || !data.list.length) {
-        const status = document.getElementById('ncm-status');
-        if (status && document.getElementById('ncm-modal').style.display === 'flex') {
-          status.textContent = '读取失败：' + (data.error || '未知错误');
+      song = cache.song;
+    } else {
+      try {
+        const resp = await fetch(`/.netlify/functions/ncm?uid=${encodeURIComponent(this.ncmUid)}`);
+        const data = await resp.json();
+        if (!data.ok || !data.list || !data.list.length) {
+          const status = document.getElementById('ncm-status');
+          if (status && document.getElementById('ncm-modal').style.display === 'flex') {
+            status.textContent = '读取失败：' + (data.error || '未知错误');
+          }
+          return null;
         }
+        // 用日期+UID做种子，保证不同日期歌曲不同且可复现
+        const seed = hashString(this.ncmUid + '|' + targetDate);
+        const picked = data.list[seed % data.list.length];
+        song = { id: picked.id, name: picked.name, artist: picked.artist, coverUrl: picked.coverUrl, lyric: '' };
+        try { localStorage.setItem(cacheKey, JSON.stringify({ date: targetDate, uid: this.ncmUid, song })); } catch (e) {}
+      } catch (e) {
+        console.warn('ncm fetch failed', e);
         return null;
       }
-      // 用日期+UID做种子，保证不同日期歌曲不同且可复现
-      const seed = hashString(this.ncmUid + '|' + targetDate);
-      const song = data.list[seed % data.list.length];
-      // 再取一句歌词（单独请求，避免服务端首次拉 1000 首歌词超时）
-      let lyric = '';
+    }
+    // 歌词缺失则补取（兼容旧缓存 / 首次拉取失败 / 后端列表缓存拦截）
+    if (song && !song.lyric) {
       try {
         const lr = await fetch(`/.netlify/functions/ncm?uid=${encodeURIComponent(this.ncmUid)}&songId=${encodeURIComponent(song.id)}`);
         const ld = await lr.json();
-        if (ld.ok) lyric = ld.lyric || '';
-      } catch (e) { lyric = ''; }
-      const result = { id: song.id, name: song.name, artist: song.artist, coverUrl: song.coverUrl, lyric };
-      try { localStorage.setItem(cacheKey, JSON.stringify({ date: targetDate, uid: this.ncmUid, song: result })); } catch (e) {}
-      return result;
-    } catch (e) {
-      console.warn('ncm fetch failed', e);
-      return null;
+        if (ld.ok && ld.lyric) {
+          song = Object.assign({}, song, { lyric: ld.lyric });
+          try { localStorage.setItem(cacheKey, JSON.stringify({ date: targetDate, uid: this.ncmUid, song })); } catch (e) {}
+        }
+      } catch (e) { /* 歌词获取失败不影响封面展示 */ }
     }
+    return song;
   }
 
   pixelateCover(proxiedUrl, size = 80) {

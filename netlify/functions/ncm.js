@@ -116,15 +116,10 @@ exports.handler = async (event) => {
     return { statusCode: 400, headers: CORS, body: JSON.stringify({ error: '缺少 uid 参数' }) };
   }
 
-    const cached = cache.get(uid);
-    const now = Date.now();
-    if (cached && now - cached.ts < 3600 * 1000) {
-      return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, cached: true, count: cached.list.length, list: cached.list }) };
-    }
-
     const todayStr = new Date().toISOString().slice(0, 10);
 
-    // 单独取歌词（按 songId），避免首次拉 1000 首歌歌词导致超时
+    // 单独取歌词（按 songId）——必须放在列表缓存判断之前！
+    // 否则带 songId 的请求会被列表缓存拦截，返回不含 lyric 的列表响应，导致前端永远拿不到歌词。
     const songId = qs.songId;
     if (songId) {
       try {
@@ -133,6 +128,12 @@ exports.handler = async (event) => {
       } catch (e) {
         return { statusCode: 500, headers: CORS, body: JSON.stringify({ ok: true, lyric: '', error: '歌词获取失败' }) };
       }
+    }
+
+    const cached = cache.get(uid);
+    const now = Date.now();
+    if (cached && now - cached.ts < 3600 * 1000) {
+      return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, cached: true, count: cached.list.length, list: cached.list }) };
     }
 
   try {
