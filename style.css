@@ -2613,13 +2613,17 @@ input::placeholder, textarea::placeholder {
 
 /* 小票收藏夹 / 托盘 */
 .receipt-view {
-  padding: 18px 16px 80px;
-  max-width: 900px;
+  padding: 18px 16px 100px;
+  max-width: 480px;
   margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100%;
 }
 .receipt-view-header {
   text-align: center;
-  margin-bottom: 22px;
+  margin-bottom: 18px;
 }
 .receipt-view-title {
   font-size: 18px;
@@ -2634,91 +2638,132 @@ input::placeholder, textarea::placeholder {
   font-family: var(--font-pixel);
 }
 
-.receipt-tray {
-  background: linear-gradient(180deg, #e0e0e0 0%, #c8c8c8 100%);
-  border-radius: 18px;
-  padding: 28px 18px 34px;
-  min-height: 260px;
-  box-shadow: inset 0 6px 18px rgba(0,0,0,0.18), 0 2px 0 rgba(255,255,255,0.4);
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 18px;
+.receipt-tray-outer {
   position: relative;
+  width: 100%;
+  max-width: 320px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.receipt-tray {
+  position: relative;
+  width: 100%;
+  min-height: 520px;
+  max-height: 70vh;
+  background: linear-gradient(180deg, #f2f2f2 0%, #d6d6d6 100%);
+  border-radius: 28px 28px 20px 20px;
+  box-shadow:
+    inset 0 8px 24px rgba(0,0,0,0.10),
+    inset 0 -4px 10px rgba(255,255,255,0.5),
+    0 14px 0 rgba(0,0,0,0.08),
+    0 18px 36px rgba(0,0,0,0.18);
+  perspective: 1200px;
+  transform-style: preserve-3d;
+  padding: 34px 18px 70px;
+  overflow: visible;
+  touch-action: none; /* 自己处理 pointer 事件 */
 }
 .receipt-tray::before {
   content: "";
   position: absolute;
-  top: 0; left: 24px; right: 24px;
-  height: 8px;
-  background: linear-gradient(180deg, rgba(0,0,0,0.22), transparent);
-  border-radius: 0 0 8px 8px;
+  top: 0; left: 34px; right: 34px;
+  height: 10px;
+  background: linear-gradient(180deg, rgba(0,0,0,0.18), transparent);
+  border-radius: 0 0 10px 10px;
   pointer-events: none;
 }
 
+.receipt-tray-base {
+  width: 92%;
+  height: 16px;
+  margin-top: -6px;
+  background: linear-gradient(180deg, #c0c0c0, #a0a0a0);
+  border-radius: 0 0 50% 50% / 0 0 100% 100%;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.18);
+  opacity: 0.8;
+}
+
 .receipt-card {
-  background: #fff;
+  position: absolute;
+  left: 50%;
+  width: 188px;
+  margin-left: -94px;
+  background: #faf8f2;
   border-radius: 8px 8px 3px 3px;
-  padding: 10px 8px 12px;
+  padding: 12px 10px 14px;
   text-align: center;
-  box-shadow: 0 6px 14px rgba(0,0,0,0.22);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.22);
   cursor: grab;
-  transition: transform 160ms ease, box-shadow 160ms ease;
-  position: relative;
+  transition: transform 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+              box-shadow 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+              top 0.28s cubic-bezier(0.22, 1, 0.36, 1),
+              left 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  transform-origin: center bottom;
+  will-change: transform, top, left;
 }
 .receipt-card::after {
   content: "";
   position: absolute;
   left: 0; right: 0; bottom: -5px;
   height: 6px;
-  background: radial-gradient(circle at 5px 0, transparent 5px, #fff 5.5px) repeat-x;
+  background: radial-gradient(circle at 5px 0, transparent 5px, #faf8f2 5.5px) repeat-x;
   background-size: 10px 6px;
 }
-.receipt-card:hover {
-  transform: translateY(-4px) rotate(-1deg);
-  box-shadow: 0 12px 22px rgba(0,0,0,0.28);
-}
-.receipt-card.dragging {
-  opacity: 0.55;
-  transform: scale(1.05) rotate(2deg);
+.receipt-card.lifted {
   cursor: grabbing;
+  transition: none;
+  z-index: 10000 !important;
+  box-shadow: 0 34px 70px rgba(0,0,0,0.40), 0 12px 24px rgba(0,0,0,0.25);
+}
+.receipt-card.tapped {
+  animation: receipt-tap 0.22s ease;
+}
+@keyframes receipt-tap {
+  0% { transform: scale(1); }
+  50% { transform: scale(0.96); }
+  100% { transform: scale(1); }
 }
 .receipt-card-date {
   font-family: var(--font-pixel);
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 400;
   color: #000;
   margin-bottom: 8px;
 }
 .receipt-card-img {
-  width: 96px;
-  height: 96px;
+  width: 110px;
+  height: 110px;
   object-fit: contain;
   image-rendering: pixelated;
-  margin: 0 auto 6px;
+  margin: 0 auto 8px;
   display: block;
   border: 2px solid #1a1a1a;
   background: #fff;
   box-shadow: 2px 2px 0 rgba(0,0,0,0.15);
 }
 .receipt-card-title {
-  font-size: 9px;
-  line-height: 1.4;
+  font-size: 10px;
+  line-height: 1.35;
   color: #000;
   font-family: var(--font-pixel);
   margin-bottom: 2px;
-  padding: 0 2px;
+  padding: 0 4px;
   word-break: break-all;
-  max-height: 26px;
+  max-height: 28px;
   overflow: hidden;
 }
 .receipt-card-artist {
-  font-size: 8px;
-  color: #666;
+  font-size: 9px;
+  color: #555;
   font-family: var(--font-pixel);
-  padding: 0 2px;
+  padding: 0 4px;
   word-break: break-all;
-  max-height: 22px;
+  max-height: 24px;
   overflow: hidden;
 }
 
