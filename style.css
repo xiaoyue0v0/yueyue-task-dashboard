@@ -2808,6 +2808,31 @@ input::placeholder, textarea::placeholder {
   max-height: 24px;
   overflow: hidden;
 }
+.receipt-card-remove {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid #1a1a1a;
+  background: rgba(250,248,242,0.85);
+  color: #1a1a1a;
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  z-index: 5;
+  transition: background 0.12s ease, color 0.12s ease, transform 0.12s ease;
+}
+.receipt-card-remove:hover {
+  background: #1a1a1a;
+  color: #faf8f2;
+  transform: scale(1.12);
+}
 
 .receipt-tray-empty {
   text-align: center;
@@ -2950,6 +2975,35 @@ input::placeholder, textarea::placeholder {
   color: #fff;
   font-size: 9px;
   text-shadow: 0 1px 2px rgba(0,0,0,0.7);
+}
+.receipt-cal-remove {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(26,26,26,0.55);
+  color: #fff;
+  font-size: 11px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  z-index: 3;
+  opacity: 0;
+  transition: opacity 0.14s ease, background 0.12s ease, transform 0.12s ease;
+}
+.receipt-cal-filled:hover .receipt-cal-remove,
+.receipt-cal-remove:focus {
+  opacity: 1;
+}
+.receipt-cal-remove:hover {
+  background: #1a1a1a;
+  transform: scale(1.12);
 }
 
 /* Cloud Sync */
