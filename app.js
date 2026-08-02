@@ -3,7 +3,6 @@ const SYNC_CODE_KEY = 'yueyue-sync-code';
 const SYNC_REMOTE_KEY = 'yueyue-last-remote';
 const NCM_UID_KEY = 'yueyue-ncm-uid';
 const NCM_CACHE_KEY = 'yueyue-ncm-cache';
-const NCM_OFFSET_KEY = 'yueyue-ncm-offset';
 
 // Netlify functions 地址：在 Netlify 域名下用相对路径；在 GitHub Pages 等其他托管下用绝对路径（指向已部署的 Netlify 站点）
 const NCM_FUNC_BASE = (location.hostname.endsWith('netlify.app') || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
@@ -1568,20 +1567,6 @@ class TaskApp {
     return `${NCM_CACHE_KEY}:${date || this.todayStr()}`;
   }
 
-  // 按日期记录手动换歌次数（用于生成不同种子）
-  _ncmOffsetKey(date) {
-    return `${NCM_OFFSET_KEY}:${date || this.todayStr()}`;
-  }
-  _getSongOffset(date) {
-    try {
-      const v = parseInt(localStorage.getItem(this._ncmOffsetKey(date)) || '0', 10);
-      return isNaN(v) ? 0 : Math.max(0, v);
-    } catch (e) { return 0; }
-  }
-  _setSongOffset(date, offset) {
-    try { localStorage.setItem(this._ncmOffsetKey(date), String(offset)); } catch (e) {}
-  }
-
   // 清空所有日期的歌曲缓存（换 UID 时调用）
   _clearAllNcmCache() {
     try {
@@ -1614,12 +1599,8 @@ class TaskApp {
           }
           return null;
         }
-        // 用日期+UID+offset做种子，offset=0 时与旧逻辑一致
-        const offset = this._getSongOffset(targetDate);
-        const seedStr = offset > 0
-          ? this.ncmUid + '|' + targetDate + '|' + offset
-          : this.ncmUid + '|' + targetDate;
-        const seed = hashString(seedStr);
+        // 默认每日歌曲：用 日期+UID 做种子，保证当天固定、跨天不同
+        const seed = hashString(this.ncmUid + '|' + targetDate);
         const picked = data.list[seed % data.list.length];
         song = { id: picked.id, name: picked.name, artist: picked.artist, coverUrl: picked.coverUrl, lyric: '' };
         try { localStorage.setItem(cacheKey, JSON.stringify({ date: targetDate, uid: this.ncmUid, song })); } catch (e) {}
@@ -1642,12 +1623,42 @@ class TaskApp {
     return song;
   }
 
-  // 手动换一首：增加 offset，清除当天缓存并重新渲染
+  // 手动换一首：完全随机从红心歌单挑一首（排除当前歌曲），写入当天缓存后重新渲染
   async refreshSongOfDay(date) {
     const targetDate = date || this.todayStr();
-    const offset = this._getSongOffset(targetDate) + 1;
-    this._setSongOffset(targetDate, offset);
-    try { localStorage.removeItem(this._ncmCacheKey(targetDate)); } catch (e) {}
+    if (!this.ncmUid) return;
+    // 当前歌曲 id，用于排除，确保换一首一定不同
+    let currentId = null;
+    const cur = this._currentReceiptMusic;
+    if (cur && cur.date === targetDate && cur.song) {
+      currentId = cur.song.id;
+    } else {
+      try {
+        const c = JSON.parse(localStorage.getItem(this._ncmCacheKey(targetDate)) || 'null');
+        if (c && c.song) currentId = c.song.id;
+      } catch (e) {}
+    }
+    try {
+      const resp = await fetch(`${NCM_FUNC_BASE}/ncm?uid=${encodeURIComponent(this.ncmUid)}`);
+      const data = await resp.json();
+      if (!data.ok || !data.list || !data.list.length) {
+        alert('读取歌单失败，请稍后再试');
+        return;
+      }
+      const list = data.list;
+      let idx;
+      if (list.length === 1) {
+        idx = 0;
+      } else {
+        do { idx = Math.floor(Math.random() * list.length); } while (list[idx].id === currentId);
+      }
+      const picked = list[idx];
+      const song = { id: picked.id, name: picked.name, artist: picked.artist, coverUrl: picked.coverUrl, lyric: '' };
+      try { localStorage.setItem(this._ncmCacheKey(targetDate), JSON.stringify({ date: targetDate, uid: this.ncmUid, song })); } catch (e) {}
+    } catch (e) {
+      console.warn('换歌失败', e);
+      return;
+    }
     await this.renderReceiptMusic(targetDate);
   }
 
