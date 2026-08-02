@@ -585,11 +585,16 @@
         <div class="receipt-barcode" id="receipt-barcode"></div>
         <div class="receipt-thanks">THANK YOU<br>明天也要继续光临呀 ♡</div>
         <div class="receipt-foot" id="receipt-date">2026-08-02 周日 · 今日</div>
+
+        <div class="receipt-actions" id="receipt-actions">
+          <button type="button" class="receipt-btn receipt-btn-secondary" onclick="app.closeReceipt()">取消</button>
+          <button type="button" class="receipt-btn receipt-btn-primary" id="receipt-favorite-btn" onclick="app.addReceiptToCollection()">加入收藏夹</button>
+        </div>
       </div>
     </div>
   </div>
 
   <script src="supabase.umd.js"></script>
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

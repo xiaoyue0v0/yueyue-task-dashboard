@@ -1132,12 +1132,81 @@ class TaskApp {
     document.getElementById('receipt-modal').style.display = 'flex';
     // 播放打印音效
     this.playPrinterSound();
+    // 初始化当前小票音乐状态，并渲染收藏按钮（等待异步封面）
+    this._currentReceiptMusic = { date, song: null, pixelUrl: null };
+    this._updateReceiptFavoriteButtons(date);
     // 异步加载「今日歌曲」封面 + 歌词（不阻塞小票弹出）
     this.renderReceiptMusic(date);
   }
 
   closeReceipt() {
     document.getElementById('receipt-modal').style.display = 'none';
+  }
+
+  isReceiptCollected(date) {
+    const targetDate = date || (this._currentReceiptMusic && this._currentReceiptMusic.date) || this.todayStr();
+    return this.receipts.some(r => r.date === targetDate);
+  }
+
+  _updateReceiptFavoriteButtons(date) {
+    const actions = document.getElementById('receipt-actions');
+    const btn = document.getElementById('receipt-favorite-btn');
+    if (!actions || !btn) return;
+    actions.style.display = 'flex';
+    const targetDate = date || (this._currentReceiptMusic && this._currentReceiptMusic.date) || this.todayStr();
+    const collected = this.isReceiptCollected(targetDate);
+    if (collected) {
+      btn.textContent = '已加入收藏夹';
+      btn.classList.add('collected');
+      btn.disabled = true;
+    } else {
+      btn.textContent = '加入收藏夹';
+      btn.classList.remove('collected');
+      btn.disabled = false;
+    }
+  }
+
+  async addReceiptToCollection() {
+    const music = this._currentReceiptMusic;
+    if (!music || !music.date) return;
+    if (!this.ncmUid) {
+      alert('还没有设置网易云 UID，先去右上角 🎵 设置吧～');
+      return;
+    }
+    // 如果当前没有歌曲信息或像素封面，重新获取
+    let song = music.song;
+    let pixelUrl = music.pixelUrl;
+    if (!song) {
+      song = await this.getSongOfDay(music.date);
+      if (!song) { alert('读取歌曲失败，请检查网易云 UID 或网络'); return; }
+    }
+    if (!pixelUrl) {
+      const proxied = this.buildProxiedCoverUrl(song.coverUrl);
+      pixelUrl = await this.pixelateCover(proxied, 80);
+    }
+    // 去重：同一日期只保留一条
+    this.receipts = this.receipts.filter(r => r.date !== music.date);
+    this.receipts.push({
+      date: music.date,
+      pixelUrl: pixelUrl || '',
+      songName: song.name,
+      artist: song.artist,
+      songId: song.id,
+      order: this.receipts.length
+    });
+    this.saveData();
+    this._updateReceiptFavoriteButtons(music.date);
+    if (this.currentView === 'receipt') this.renderReceiptView();
+  }
+
+  removeReceiptFromCollection(date) {
+    if (!date) return;
+    this.receipts = this.receipts.filter(r => r.date !== date);
+    this.saveData();
+    if (this.currentView === 'receipt') this.renderReceiptView();
+    if (this._currentReceiptMusic && this._currentReceiptMusic.date === date) {
+      this._updateReceiptFavoriteButtons(date);
+    }
   }
 
   // 播放「小票打印」音效（Web Audio API 生成点阵打印机的咔嗒声）
@@ -1193,7 +1262,7 @@ class TaskApp {
     this.ncmUid = v;
     if (v) localStorage.setItem(NCM_UID_KEY, v);
     else localStorage.removeItem(NCM_UID_KEY);
-    localStorage.removeItem(NCM_CACHE_KEY); // 换 UID 清空缓存
+    this._clearAllNcmCache(); // 换 UID 清空按日期缓存
     const clearBtn = document.getElementById('ncm-clear');
     if (clearBtn) clearBtn.style.display = v ? 'inline-block' : 'none';
     const status = document.getElementById('ncm-status');
@@ -1203,7 +1272,7 @@ class TaskApp {
   clearNcm() {
     this.ncmUid = '';
     localStorage.removeItem(NCM_UID_KEY);
-    localStorage.removeItem(NCM_CACHE_KEY);
+    this._clearAllNcmCache();
     const input = document.getElementById('ncm-uid');
     if (input) input.value = '';
     this.closeNcmModal();
@@ -1213,12 +1282,30 @@ class TaskApp {
     return `/.netlify/functions/ncm-cover?url=${encodeURIComponent(coverUrl)}`;
   }
 
-  async getSongOfDay() {
+  // 按日期缓存 key
+  _ncmCacheKey(date) {
+    return `${NCM_CACHE_KEY}:${date || this.todayStr()}`;
+  }
+
+  // 清空所有日期的歌曲缓存（换 UID 时调用）
+  _clearAllNcmCache() {
+    try {
+      const toRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(`${NCM_CACHE_KEY}:`)) toRemove.push(key);
+      }
+      toRemove.forEach(key => localStorage.removeItem(key));
+    } catch (e) {}
+  }
+
+  async getSongOfDay(date) {
     if (!this.ncmUid) return null;
-    const today = this.todayStr();
+    const targetDate = date || this.todayStr();
+    const cacheKey = this._ncmCacheKey(targetDate);
     let cache = null;
-    try { cache = JSON.parse(localStorage.getItem(NCM_CACHE_KEY) || 'null'); } catch (e) { cache = null; }
-    if (cache && cache.date === today && cache.uid === this.ncmUid && cache.song) {
+    try { cache = JSON.parse(localStorage.getItem(cacheKey) || 'null'); } catch (e) { cache = null; }
+    if (cache && cache.date === targetDate && cache.uid === this.ncmUid && cache.song) {
       return cache.song;
     }
     try {
@@ -1231,7 +1318,8 @@ class TaskApp {
         }
         return null;
       }
-      const seed = hashString(this.ncmUid + '|' + today);
+      // 用日期+UID做种子，保证不同日期歌曲不同且可复现
+      const seed = hashString(this.ncmUid + '|' + targetDate);
       const song = data.list[seed % data.list.length];
       // 再取一句歌词（单独请求，避免服务端首次拉 1000 首歌词超时）
       let lyric = '';
@@ -1240,8 +1328,8 @@ class TaskApp {
         const ld = await lr.json();
         if (ld.ok) lyric = ld.lyric || '';
       } catch (e) { lyric = ''; }
-      const result = { name: song.name, artist: song.artist, coverUrl: song.coverUrl, lyric };
-      try { localStorage.setItem(NCM_CACHE_KEY, JSON.stringify({ date: today, uid: this.ncmUid, song: result })); } catch (e) {}
+      const result = { id: song.id, name: song.name, artist: song.artist, coverUrl: song.coverUrl, lyric };
+      try { localStorage.setItem(cacheKey, JSON.stringify({ date: targetDate, uid: this.ncmUid, song: result })); } catch (e) {}
       return result;
     } catch (e) {
       console.warn('ncm fetch failed', e);
@@ -1302,11 +1390,14 @@ class TaskApp {
   async renderReceiptMusic(date) {
     const el = document.getElementById('receipt-music');
     if (!el) return;
+    // 重置当前小票音乐状态
+    this._currentReceiptMusic = { date: date || this.todayStr(), song: null, pixelUrl: null };
     if (!this.ncmUid) { el.style.display = 'none'; return; }
-    const song = await this.getSongOfDay();
+    const song = await this.getSongOfDay(date);
     if (!song) { el.style.display = 'none'; return; }
     const proxied = this.buildProxiedCoverUrl(song.coverUrl);
     const pixel = await this.pixelateCover(proxied, 80);
+    this._currentReceiptMusic = { date: date || this.todayStr(), song, pixelUrl: pixel };
     el.style.display = 'block';
     const lyricHtml = song.lyric
       ? `<div class="receipt-music-lyric">“${this.escapeHtml(song.lyric)}”</div>`
@@ -1321,6 +1412,8 @@ class TaskApp {
         <div class="receipt-music-artist">${this.escapeHtml(song.artist)}</div>
       </div>
       ${lyricHtml}`;
+    // 音乐加载完后刷新收藏按钮状态（因为可能已经生成像素封面）
+    this._updateReceiptFavoriteButtons(date || this.todayStr());
   }
 
   closeTopModal() {
@@ -1376,14 +1469,23 @@ class TaskApp {
       const d = new Date(r.date);
       const mm = String(d.getMonth() + 1).padStart(2, '0');
       const dd = String(d.getDate()).padStart(2, '0');
+      const title = r.songName || r.pattern || 'RECEIPT';
+      const artist = r.artist || '';
+      // 兼容旧数据：没有 pixelUrl 时回退到旧的 generatePixelArt
+      let imgUrl = r.pixelUrl;
+      if (!imgUrl && r.pattern) {
+        const legacy = generatePixelArt(r.date);
+        imgUrl = legacy.dataUrl;
+      }
       return `
         <div class="receipt-card" draggable="true" data-date="${r.date}" data-idx="${idx}"
              ondragstart="app.dragReceipt(event, '${r.date}')"
              ondragend="app.endDragReceipt(event)"
              onclick="app.openReceipt('${r.date}')">
           <div class="receipt-card-date">${mm}.${dd}</div>
-          <img class="receipt-card-img" src="${r.pixelUrl || ''}" alt="${r.pattern || ''}" />
-          <div class="receipt-card-pattern">${r.pattern || 'pixel'}</div>
+          <img class="receipt-card-img" src="${imgUrl || ''}" alt="${this.escapeHtml(title)}" />
+          <div class="receipt-card-title">${this.escapeHtml(title)}</div>
+          ${artist ? `<div class="receipt-card-artist">${this.escapeHtml(artist)}</div>` : ''}
         </div>
       `;
     }).join('');
