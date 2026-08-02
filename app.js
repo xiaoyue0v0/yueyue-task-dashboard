@@ -1408,6 +1408,9 @@ class TaskApp {
   }
 
   // 将小票导出为 PNG
+  // 关键：直接捕获屏幕上正在显示的小票（导出时它一定可见），
+  // 不用离屏克隆——dom-to-image 用 SVG <foreignObject> 渲染，离屏定位
+  // 在移动端浏览器会把内容画到可视区外导致空白 PNG（老方案的坑）。
   async exportReceiptPng() {
     if (typeof domtoimage === 'undefined') {
       alert('导出组件还没准备好，请刷新页面后再试～');
@@ -1421,76 +1424,100 @@ class TaskApp {
       try { await document.fonts.ready; } catch (e) {}
     }
 
-    // 克隆到离屏固定宽度容器，避免移动端 max-width:96% 导致截断
-    // 注意：不能用 visibility:hidden —— 它会继承到克隆体，导致导出空白 PNG
-    const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:420px;z-index:-1;overflow:visible;';
-    document.body.appendChild(wrapper);
-
-    const clone = paper.cloneNode(true);
-    const cloneId = 'receipt-export-clone-' + Date.now();
-    clone.id = cloneId;
-    clone.style.cssText = 'width:400px;max-width:none;margin:0;transform:none;animation:none;position:relative;box-shadow:none;overflow:visible;visibility:visible;';
-
-    // 移除导出时不需要的 UI
-    const closeBtn = clone.querySelector('.receipt-close');
-    const actions = clone.querySelector('.receipt-actions');
-    if (closeBtn) closeBtn.remove();
-    if (actions) actions.remove();
-
-    // 注入覆盖样式：禁止任何截断、省略，确保内容完整
-    const overrideStyle = document.createElement('style');
-    overrideStyle.textContent = `
-      #${cloneId} .receipt-row-label,
-      #${cloneId} .receipt-row-value,
-      #${cloneId} .receipt-music-name,
-      #${cloneId} .receipt-music-artist,
-      #${cloneId} .receipt-music-lyric,
-      #${cloneId} .receipt-review,
-      #${cloneId} .receipt-thanks,
-      #${cloneId} .receipt-foot {
-        max-width: none !important;
-        min-width: 0 !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        white-space: normal !important;
-        flex-shrink: 0 !important;
-      }
-      #${cloneId} .receipt-row-data {
-        flex-wrap: wrap !important;
-        gap: 2px 8px !important;
-      }
-      #${cloneId} .receipt-row-value {
-        margin-left: auto !important;
-      }
-      #${cloneId} .receipt-row-dots {
-        flex: 1 1 auto !important;
-        min-width: 12px !important;
-      }
-    `;
-
-    wrapper.appendChild(overrideStyle);
-    wrapper.appendChild(clone);
-
-    try {
-      const dataUrl = await domtoimage.toPng(clone, {
-        bgcolor: '#ffffff',
-        scale: 2,
-        width: 400,
-        height: clone.scrollHeight,
-        style: { margin: '0' }
+    // 临时隐藏导出不需要的 UI（直接隐藏，而非克隆移除）
+    const hideSelectors = ['.receipt-close', '.receipt-actions', '.receipt-music-mode', '.receipt-music-refresh'];
+    const hiddenEls = [];
+    hideSelectors.forEach(sel => {
+      paper.querySelectorAll(sel).forEach(el => {
+        const prev = el.style.display;
+        el.style.display = 'none';
+        hiddenEls.push({ el, prev });
       });
+    });
+
+    // 记下面板与祖先的原始样式（导出后还原）
+    const prevStyle = {
+      animation: paper.style.animation,
+      width: paper.style.width,
+      maxWidth: paper.style.maxWidth,
+      boxShadow: paper.style.boxShadow,
+      transform: paper.style.transform,
+      fontFamily: paper.style.fontFamily,
+    };
+    const sheet = paper.closest('.receipt-sheet');
+    const prevSheet = sheet ? { perspective: sheet.style.perspective, transform: sheet.style.transform } : null;
+
+    // 取消开场动画（避免 clip-path 残留），固定宽度保证完整不截断
+    paper.style.animation = 'none';
+    paper.style.width = '400px';
+    paper.style.maxWidth = 'none';
+    paper.style.boxShadow = 'none';
+    paper.style.transform = 'none';
+    // 去掉祖先的 3D 变换，避免移动端 foreignObject 渲染错位/空白
+    if (sheet) { sheet.style.perspective = 'none'; sheet.style.transform = 'none'; }
+
+    const doCapture = () => domtoimage.toPng(paper, {
+      bgcolor: '#ffffff',
+      scale: 2,
+      cacheBust: true,
+    });
+
+    let dataUrl;
+    try {
+      dataUrl = await doCapture();
+      // 空白自检：若结果几乎全白，可能是远程像素字体在弱网/墙内
+      // 没加载成功导致 foreignObject 渲染失败 —— 退回系统等宽字体重试一次
+      if (await this._isBlankPng(dataUrl)) {
+        paper.style.fontFamily = 'Courier New, monospace';
+        dataUrl = await doCapture();
+      }
+    } catch (err) {
+      console.error('导出小票失败', err);
+      alert('导出图片失败：' + (err && err.message ? err.message : '未知错误'));
+    } finally {
+      // 还原隐藏的 UI 与样式
+      hiddenEls.forEach(({ el, prev }) => { el.style.display = prev; });
+      paper.style.animation = prevStyle.animation;
+      paper.style.width = prevStyle.width;
+      paper.style.maxWidth = prevStyle.maxWidth;
+      paper.style.boxShadow = prevStyle.boxShadow;
+      paper.style.transform = prevStyle.transform;
+      paper.style.fontFamily = prevStyle.fontFamily;
+      if (sheet && prevSheet) { sheet.style.perspective = prevSheet.perspective; sheet.style.transform = prevSheet.transform; }
+    }
+
+    if (dataUrl) {
       const date = (this._currentReceiptMusic && this._currentReceiptMusic.date) || this.todayStr();
       const link = document.createElement('a');
       link.download = `receipt-${date}.png`;
       link.href = dataUrl;
       link.click();
-    } catch (err) {
-      console.error('导出小票失败', err);
-      alert('导出图片失败：' + (err && err.message ? err.message : '未知错误'));
-    } finally {
-      if (wrapper.parentNode) wrapper.parentNode.removeChild(wrapper);
     }
+  }
+
+  // 判断导出的 PNG 是否几乎全白（空白）。在浏览器内把 dataURL 画到
+  // canvas 上统计非白像素占比，比例过低即视为空白。
+  _isBlankPng(dataUrl) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const c = document.createElement('canvas');
+          c.width = img.width; c.height = img.height;
+          const ctx = c.getContext('2d');
+          ctx.drawImage(img, 0, 0);
+          const data = ctx.getImageData(0, 0, c.width, c.height).data;
+          let nonWhite = 0;
+          for (let i = 0; i < data.length; i += 4) {
+            if (!(data[i] === 255 && data[i + 1] === 255 && data[i + 2] === 255)) nonWhite++;
+          }
+          const ratio = nonWhite / (data.length / 4);
+          resolve(ratio < 0.02); // 非白像素 < 2% 视为空白
+        } catch (e) { resolve(false); }
+      };
+      img.onerror = () => resolve(false);
+      img.src = dataUrl;
+    });
   }
 
   // 播放「小票打印」音效（Web Audio API 生成点阵打印机的咔嗒声）
