@@ -3,6 +3,7 @@ const SYNC_CODE_KEY = 'yueyue-sync-code';
 const SYNC_REMOTE_KEY = 'yueyue-last-remote';
 const NCM_UID_KEY = 'yueyue-ncm-uid';
 const NCM_CACHE_KEY = 'yueyue-ncm-cache';
+const PIXEL_MODE_KEY = 'yueyue-pixel-mode';
 
 // Netlify functions 地址：在 Netlify 域名下用相对路径；在 GitHub Pages 等其他托管下用绝对路径（指向已部署的 Netlify 站点）
 const NCM_FUNC_BASE = (location.hostname.endsWith('netlify.app') || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
@@ -1377,13 +1378,15 @@ class TaskApp {
     }
     if (!pixelUrl) {
       const proxied = this.buildProxiedCoverUrl(song.coverUrl);
-      pixelUrl = await this.pixelateCover(proxied, 80);
+      pixelUrl = await this.pixelateCover(proxied, 80, this._getPixelMode());
     }
     // 去重：同一日期只保留一条
     this.receipts = this.receipts.filter(r => r.date !== music.date);
     this.receipts.push({
       date: music.date,
       pixelUrl: pixelUrl || '',
+      pixelMode: this._getPixelMode(),
+      coverUrl: (song && song.coverUrl) || '',
       songName: song.name,
       artist: song.artist,
       songId: song.id,
@@ -1663,7 +1666,7 @@ class TaskApp {
     await this.renderReceiptMusic(targetDate);
   }
 
-  pixelateCover(proxiedUrl, size = 80) {
+  pixelateCover(proxiedUrl, size = 80, mode = 'bw') {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -1678,22 +1681,42 @@ class TaskApp {
           const px = sctx.getImageData(0, 0, size, size);
           const d = px.data;
 
-          // 4x4 Bayer 有序抖动，让灰度过渡更自然、封面更易辨认
+          // 4x4 Bayer 有序抖动
           const bayer = [
             [0, 8, 2, 10],
             [12, 4, 14, 6],
             [3, 11, 1, 9],
             [15, 7, 13, 5]
           ];
-          for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-              const i = (y * size + x) * 4;
-              const r = d[i], g = d[i + 1], b = d[i + 2];
-              let gray = 0.299 * r + 0.587 * g + 0.114 * b;
-              gray = (gray - 128) * 1.2 + 128;
-              const threshold = ((bayer[y % 4][x % 4] + 0.5) / 16) * 255;
-              const v = gray > threshold ? 245 : 18;
-              d[i] = d[i + 1] = d[i + 2] = v;
+
+          if (mode === 'color') {
+            // 彩色像素：保留原图颜色，逐通道有序抖动 + 量化（复古调色板）
+            const levels = 6;                    // 每通道 6 级
+            const step = 255 / (levels - 1);
+            for (let y = 0; y < size; y++) {
+              for (let x = 0; x < size; x++) {
+                const i = (y * size + x) * 4;
+                for (let c = 0; c < 3; c++) {
+                  let v = d[i + c];
+                  v = (v - 128) * 1.12 + 128;    // 轻微对比增强
+                  const threshold = ((bayer[y % 4][x % 4] + 0.5) / 16) * step - step / 2;
+                  let q = Math.round((v + threshold) / step) * step;
+                  d[i + c] = q < 0 ? 0 : (q > 255 ? 255 : q);
+                }
+              }
+            }
+          } else {
+            // 黑白像素（原逻辑）：灰度 + Bayer 抖动 → 双色调
+            for (let y = 0; y < size; y++) {
+              for (let x = 0; x < size; x++) {
+                const i = (y * size + x) * 4;
+                const r = d[i], g = d[i + 1], b = d[i + 2];
+                let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+                gray = (gray - 128) * 1.2 + 128;
+                const threshold = ((bayer[y % 4][x % 4] + 0.5) / 16) * 255;
+                const v = gray > threshold ? 245 : 18;
+                d[i] = d[i + 1] = d[i + 2] = v;
+              }
             }
           }
           sctx.putImageData(px, 0, 0);
@@ -1713,6 +1736,22 @@ class TaskApp {
     });
   }
 
+  _getPixelMode() {
+    try { return localStorage.getItem(PIXEL_MODE_KEY) === 'color' ? 'color' : 'bw'; } catch (e) { return 'bw'; }
+  }
+  _setPixelMode(v) {
+    try { localStorage.setItem(PIXEL_MODE_KEY, v === 'color' ? 'color' : 'bw'); } catch (e) {}
+  }
+
+  // 按当前配色偏好异步重生某条收藏的像素封面
+  _regenCover(receipt, cb) {
+    if (!receipt || !receipt.coverUrl) return;
+    const proxied = this.buildProxiedCoverUrl(receipt.coverUrl);
+    this.pixelateCover(proxied, 80, this._getPixelMode()).then(url => {
+      if (url && cb) cb(url);
+    });
+  }
+
   async renderReceiptMusic(date) {
     const el = document.getElementById('receipt-music');
     if (!el) return;
@@ -1722,12 +1761,13 @@ class TaskApp {
     const song = await this.getSongOfDay(date);
     if (!song) { el.style.display = 'none'; return; }
     const proxied = this.buildProxiedCoverUrl(song.coverUrl);
-    const pixel = await this.pixelateCover(proxied, 80);
+    const pixel = await this.pixelateCover(proxied, 80, this._getPixelMode());
     this._currentReceiptMusic = { date: date || this.todayStr(), song, pixelUrl: pixel };
     el.style.display = 'block';
     const lyricHtml = song.lyric
       ? `<div class="receipt-music-lyric">“${this.escapeHtml(song.lyric)}”</div>`
       : '';
+    const curMode = this._getPixelMode();
     el.innerHTML = `
       <div class="receipt-music-label">♫ 今日歌曲 / TODAY'S TRACK</div>
       <div class="receipt-music-hero">
@@ -1737,10 +1777,44 @@ class TaskApp {
         <div class="receipt-music-name">${this.escapeHtml(song.name)}</div>
         <div class="receipt-music-artist">${this.escapeHtml(song.artist)}</div>
       </div>
-      <button type="button" class="receipt-music-refresh" onclick="app.refreshSongOfDay('${date || this.todayStr()}')" title="换一首">↻ 换一首</button>
+      <div class="receipt-music-actions">
+        <button type="button" class="receipt-music-refresh" onclick="app.refreshSongOfDay('${date || this.todayStr()}')" title="换一首">↻ 换一首</button>
+        <button type="button" class="receipt-music-refresh receipt-music-mode" onclick="app.togglePixelMode('${date || this.todayStr()}')" title="切换像素封面配色">${curMode === 'color' ? '◑ 彩色' : '◐ 黑白'}</button>
+      </div>
       ${lyricHtml}`;
     // 音乐加载完后刷新收藏按钮状态（因为可能已经生成像素封面）
     this._updateReceiptFavoriteButtons(date || this.todayStr());
+  }
+
+  // 切换像素封面配色（黑白 / 彩色），立即更新当前小票与已收藏的该日封面
+  async togglePixelMode(date) {
+    const next = this._getPixelMode() === 'color' ? 'bw' : 'color';
+    this._setPixelMode(next);
+    const targetDate = date || this.todayStr();
+    const music = this._currentReceiptMusic;
+    // 1) 立即更新「今日歌曲」封面
+    if (music && music.song && music.song.coverUrl) {
+      const proxied = this.buildProxiedCoverUrl(music.song.coverUrl);
+      const pixel = await this.pixelateCover(proxied, 80, next);
+      this._currentReceiptMusic = Object.assign({}, music, { pixelUrl: pixel });
+      const coverImg = document.querySelector('#receipt-music .receipt-music-cover img');
+      if (coverImg && pixel) coverImg.src = pixel;
+    }
+    const modeBtn = document.querySelector('#receipt-music .receipt-music-mode');
+    if (modeBtn) modeBtn.textContent = next === 'color' ? '◑ 彩色' : '◐ 黑白';
+    // 2) 同步更新已收藏的该日小票封面（需有原图地址）
+    if (this.isReceiptCollected(targetDate)) {
+      const r = this.receipts.find(x => x.date === targetDate);
+      if (r && r.coverUrl) {
+        this._regenCover(r, (url) => {
+          r.pixelUrl = url; r.pixelMode = next; this.saveData();
+          const cardImg = document.querySelector(`.receipt-card[data-date="${targetDate}"] .receipt-card-img`);
+          if (cardImg) cardImg.src = url;
+          const calImg = document.querySelector(`.receipt-cal-filled[data-date="${targetDate}"] .receipt-cal-cover`);
+          if (calImg) calImg.src = url;
+        });
+      }
+    }
   }
 
   closeTopModal() {
@@ -1838,6 +1912,14 @@ class TaskApp {
     if (!imgUrl && r.pattern) {
       try { imgUrl = generatePixelArt(r.date).dataUrl; } catch (e) { imgUrl = ''; }
     }
+    // 当前配色偏好与已存封面不一致时，异步重新生成为当前配色
+    if (r.pixelMode && r.pixelMode !== this._getPixelMode() && r.coverUrl) {
+      this._regenCover(r, (url) => {
+        r.pixelUrl = url; r.pixelMode = this._getPixelMode(); this.saveData();
+        const imgEl = div.querySelector('.receipt-card-img');
+        if (imgEl) imgEl.src = url;
+      });
+    }
     const items = this._receiptCompletedItemTitles(r.date).slice(0, 5);
     const itemLines = items.length
       ? items.map(t => `<div class="rs-line"><span class="rs-check">✓</span><span class="rs-text">${this.escapeHtml(t)}</span></div>`).join('')
@@ -1909,6 +1991,14 @@ class TaskApp {
       }
       let img = c.pixelUrl;
       if (!img && c.pattern) { try { img = generatePixelArt(c.date).dataUrl; } catch (e) { img = ''; } }
+      // 当前配色偏好与已存封面不一致时，异步重新生成为当前配色
+      if (c.pixelMode && c.pixelMode !== this._getPixelMode() && c.coverUrl) {
+        this._regenCover(c, (url) => {
+          c.pixelUrl = url; c.pixelMode = this._getPixelMode(); this.saveData();
+          const cellImg = grid.querySelector(`.receipt-cal-filled[data-date="${c.date}"] .receipt-cal-cover`);
+          if (cellImg) cellImg.src = url;
+        });
+      }
       const title = this.escapeHtml(c.songName || c.pattern || 'RECEIPT');
       return `<div class="receipt-cal-cell receipt-cal-filled" data-date="${c.date}" onclick="app.openReceipt('${c.date}')" title="${title}">
           <img class="receipt-cal-cover" src="${img || ''}" alt="" draggable="false" />

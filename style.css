@@ -2488,6 +2488,19 @@ input::placeholder, textarea::placeholder {
   color: #000;
   border-color: #000;
 }
+.receipt-music-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  margin: 8px auto 4px;
+}
+.receipt-music-actions .receipt-music-refresh {
+  margin: 0;
+}
+.receipt-music-mode {
+  border-style: solid;
+  color: #1a1a1a;
+}
 
 .receipt-row-data {
   display: flex;
