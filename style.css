@@ -3177,3 +3177,93 @@ input::placeholder, textarea::placeholder {
     padding: 10px 12px;
   }
 }
+
+/* ===== 悬浮便签纸 ===== */
+.sticky-note {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 99999; /* 在所有工作台之上 */
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+.sticky-toggle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(145deg, #ffe27a, #ffcf3f);
+  color: #5a4a00;
+  font-size: 24px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.28);
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.sticky-toggle:active { transform: scale(0.92); }
+.sticky-panel {
+  width: 260px;
+  max-width: calc(100vw - 36px);
+  margin-bottom: 10px;
+  background: #fff7c2;
+  border: 1px solid #e7d98a;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.30);
+  overflow: hidden;
+  transform-origin: bottom right;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+}
+.sticky-note.collapsed .sticky-panel {
+  display: none;
+}
+.sticky-note:not(.collapsed) .sticky-panel {
+  animation: stickyPop 0.16s ease both;
+}
+@keyframes stickyPop {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); }
+  to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+.sticky-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  background: #ffe98a;
+  border-bottom: 1px solid #e7d98a;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.sticky-header:active { cursor: grabbing; }
+.sticky-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #6b5800;
+  letter-spacing: 0.5px;
+}
+.sticky-close {
+  border: none;
+  background: transparent;
+  color: #6b5800;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 2px;
+}
+.sticky-text {
+  width: 100%;
+  box-sizing: border-box;
+  height: 160px;
+  border: none;
+  outline: none;
+  resize: none;
+  padding: 10px 12px;
+  background: #fff7c2;
+  color: #4a3c00;
+  font-size: 13px;
+  line-height: 1.6;
+  font-family: inherit;
+}
+.sticky-text::placeholder { color: #b6a85a; }

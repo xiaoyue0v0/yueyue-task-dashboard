@@ -437,7 +437,70 @@ class TaskApp {
 
     window.addEventListener('resize', () => this.handleResize());
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.closeTopModal(); });
+    this.initStickyNote();
     this.autoConnect();
+  }
+
+  // ===== 悬浮便签纸 =====
+  initStickyNote() {
+    const root = document.getElementById('sticky-note');
+    const toggle = document.getElementById('sticky-toggle');
+    const closeBtn = document.getElementById('sticky-close');
+    const textarea = document.getElementById('sticky-text');
+    if (!root || !toggle || !textarea) return;
+
+    const KEY_TEXT = 'yueyue-sticky-note';
+    const KEY_OPEN = 'yueyue-sticky-open';
+
+    // 恢复上次内容
+    const saved = localStorage.getItem(KEY_TEXT);
+    if (saved != null) textarea.value = saved;
+    // 恢复展开/收起状态（默认收起）
+    if (localStorage.getItem(KEY_OPEN) === '1') root.classList.remove('collapsed');
+
+    const save = () => { localStorage.setItem(KEY_TEXT, textarea.value); };
+    textarea.addEventListener('input', save);
+
+    const open = () => { root.classList.remove('collapsed'); localStorage.setItem(KEY_OPEN, '1'); textarea.focus(); };
+    const collapse = () => { root.classList.add('collapsed'); localStorage.setItem(KEY_OPEN, '0'); };
+    toggle.addEventListener('click', () => {
+      if (root.classList.contains('collapsed')) open(); else collapse();
+    });
+    if (closeBtn) closeBtn.addEventListener('click', collapse);
+
+    // 拖拽：按住标题栏可移动便签（移动端用 pointer 事件）
+    const header = root.querySelector('.sticky-header');
+    if (header) {
+      let dragging = false, sx = 0, sy = 0, ox = 0, oy = 0;
+      const onDown = (e) => {
+        // 点关闭按钮不触发拖拽，也不拦截 click
+        if (e.target.closest('.sticky-close')) return;
+        dragging = true;
+        const rect = root.getBoundingClientRect();
+        // 切换为 left/top 定位，避免 right/bottom 冲突
+        root.style.left = rect.left + 'px';
+        root.style.top = rect.top + 'px';
+        root.style.right = 'auto';
+        root.style.bottom = 'auto';
+        sx = e.clientX; sy = e.clientY; ox = rect.left; oy = rect.top;
+        header.setPointerCapture && header.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      };
+      const onMove = (e) => {
+        if (!dragging) return;
+        let nx = ox + (e.clientX - sx);
+        let ny = oy + (e.clientY - sy);
+        nx = Math.max(0, Math.min(nx, window.innerWidth - root.offsetWidth));
+        ny = Math.max(0, Math.min(ny, window.innerHeight - 40));
+        root.style.left = nx + 'px';
+        root.style.top = ny + 'px';
+      };
+      const onUp = () => { dragging = false; };
+      header.addEventListener('pointerdown', onDown);
+      header.addEventListener('pointermove', onMove);
+      header.addEventListener('pointerup', onUp);
+      header.addEventListener('pointercancel', onUp);
+    }
   }
 
   getLayoutMode() {
