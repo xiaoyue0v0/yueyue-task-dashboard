@@ -2609,7 +2609,7 @@ input::placeholder, textarea::placeholder {
   justify-content: center;
   text-align: center;
 }
-.receipt-totals .receipt-row-label {
+.receipt-totals .receipt-total-row .receipt-row-label {
   font-weight: 600;
   white-space: nowrap;
   max-width: none;

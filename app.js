@@ -1456,6 +1456,29 @@ class TaskApp {
     // 去掉祖先的 3D 变换，避免移动端 foreignObject 渲染错位/空白
     if (sheet) { sheet.style.perspective = 'none'; sheet.style.transform = 'none'; }
 
+    // 强制取消所有文字截断/省略，防止老版本 CSS 缓存导致导出不全
+    const inlineOverrides = [];
+    const resetTextTruncation = (el) => {
+      inlineOverrides.push({
+        el,
+        maxWidth: el.style.maxWidth,
+        overflow: el.style.overflow,
+        textOverflow: el.style.textOverflow,
+        whiteSpace: el.style.whiteSpace,
+        flexShrink: el.style.flexShrink,
+      });
+      el.style.maxWidth = 'none';
+      el.style.overflow = 'visible';
+      el.style.textOverflow = 'clip';
+      el.style.whiteSpace = 'nowrap';
+      el.style.flexShrink = '0';
+    };
+    paper.querySelectorAll('.receipt-row-label, .receipt-row-value, .receipt-row-dots, .receipt-music-name, .receipt-music-artist, .receipt-music-lyric, .receipt-review, .receipt-thanks, .receipt-foot').forEach(resetTextTruncation);
+    paper.querySelectorAll('.receipt-row-data').forEach(el => {
+      inlineOverrides.push({ el, flexWrap: el.style.flexWrap });
+      el.style.flexWrap = 'nowrap';
+    });
+
     const doCapture = () => domtoimage.toPng(paper, {
       bgcolor: '#ffffff',
       scale: 2,
@@ -1477,6 +1500,10 @@ class TaskApp {
     } finally {
       // 还原隐藏的 UI 与样式
       hiddenEls.forEach(({ el, prev }) => { el.style.display = prev; });
+      inlineOverrides.forEach(item => {
+        const { el, ...rest } = item;
+        Object.keys(rest).forEach(prop => { el.style[prop] = rest[prop]; });
+      });
       paper.style.animation = prevStyle.animation;
       paper.style.width = prevStyle.width;
       paper.style.maxWidth = prevStyle.maxWidth;
