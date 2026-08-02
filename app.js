@@ -1526,6 +1526,9 @@ class TaskApp {
     div.dataset.date = r.date;
     div.dataset.idx = idx;
     div.innerHTML = `
+      <div class="receipt-card-remove" title="取消收藏"
+           onpointerdown="event.stopPropagation()"
+           onclick="app.removeReceiptFromCollection('${r.date}')">✕</div>
       <div class="receipt-card-date">${mm}.${dd} 周${WEEKDAY_NAMES[d.getDay()]}</div>
       <div class="receipt-card-cover"><img class="receipt-card-img" src="${imgUrl || ''}" alt="${this.escapeHtml(title)}" draggable="false" /></div>
       <div class="receipt-card-title">${this.escapeHtml(title)}</div>
@@ -1589,6 +1592,9 @@ class TaskApp {
       return `<div class="receipt-cal-cell receipt-cal-filled" data-date="${c.date}" onclick="app.openReceipt('${c.date}')" title="${title}">
           <img class="receipt-cal-cover" src="${img || ''}" alt="" draggable="false" />
           <span class="receipt-cal-num">${day}</span>
+          <button class="receipt-cal-remove" title="取消收藏"
+            onpointerdown="event.stopPropagation()"
+            onclick="event.stopPropagation(); app.removeReceiptFromCollection('${c.date}')">✕</button>
         </div>`;
     }).join('');
     if (empty) empty.style.display = map.size === 0 ? 'block' : 'none';
