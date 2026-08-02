@@ -4,8 +4,10 @@
 //
 // 端点：
 //   GET /.netlify/functions/ncm?uid=XXXX
-// 返回：{ ok, playlistId, count, list:[{id,name,artist,coverUrl,lyrics?}] }
-//   其中 lyrics 是随机一句有效歌词（没有则返回空字符串）
+// 返回：{ ok, playlistId, count, list:[{id,name,artist,coverUrl}] }
+//
+//   GET /.netlify/functions/ncm?uid=XXXX&songId=YYYY
+// 返回：{ ok, lyric: "..." }  （随机一句有效歌词，没有则空字符串）
 //
 // 后端地址可配：在 Netlify 控制台设置环境变量 NCM_API_BASE 指向你自己部署的 NeteaseCloudMusicApi。
 // 不再默认使用任何公开第三方实例（它们经常失效/限流）。
@@ -122,6 +124,17 @@ exports.handler = async (event) => {
 
     const todayStr = new Date().toISOString().slice(0, 10);
 
+    // 单独取歌词（按 songId），避免首次拉 1000 首歌歌词导致超时
+    const songId = qs.songId;
+    if (songId) {
+      try {
+        const lyric = await fetchLyric(songId, uid + '|' + todayStr + '|' + songId);
+        return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, lyric }) };
+      } catch (e) {
+        return { statusCode: 500, headers: CORS, body: JSON.stringify({ ok: true, lyric: '', error: '歌词获取失败' }) };
+      }
+    }
+
   try {
     // 1) 获取该用户的歌单列表，筛出本人创建的，再找「我喜欢的音乐」(specialType === 5)
     const { status: ps, data: pl } = await ncmGet('/user/playlist', 'uid=' + encodeURIComponent(uid) + '&limit=1000&offset=0');
@@ -143,15 +156,6 @@ exports.handler = async (event) => {
     if (list.length === 0) {
       return { statusCode: 404, headers: CORS, body: JSON.stringify({ error: '歌单里没有可读取的歌曲', hint: '可能是「我喜欢的音乐」设为私密或为空' }) };
     }
-
-    // 3) 为每首歌补一句歌词（按歌曲 id+日期种子随机选一句）；失败时 lyric 为空，不阻塞。
-    const lyricSeedBase = uid + '|' + todayStr;
-    list = await Promise.all(
-      list.map(async (song) => {
-        const lyric = await fetchLyric(song.id, lyricSeedBase + '|' + song.id);
-        return { ...song, lyric };
-      })
-    );
 
     cache.set(uid, { ts: now, list });
     return { statusCode: 200, headers: CORS, body: JSON.stringify({ ok: true, playlistId: liked.id, count: list.length, list }) };

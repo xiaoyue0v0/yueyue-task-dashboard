@@ -1203,7 +1203,14 @@ class TaskApp {
       }
       const seed = hashString(this.ncmUid + '|' + today);
       const song = data.list[seed % data.list.length];
-      const result = { name: song.name, artist: song.artist, coverUrl: song.coverUrl, lyric: song.lyric || '' };
+      // 再取一句歌词（单独请求，避免服务端首次拉 1000 首歌词超时）
+      let lyric = '';
+      try {
+        const lr = await fetch(`/.netlify/functions/ncm?uid=${encodeURIComponent(this.ncmUid)}&songId=${encodeURIComponent(song.id)}`);
+        const ld = await lr.json();
+        if (ld.ok) lyric = ld.lyric || '';
+      } catch (e) { lyric = ''; }
+      const result = { name: song.name, artist: song.artist, coverUrl: song.coverUrl, lyric };
       try { localStorage.setItem(NCM_CACHE_KEY, JSON.stringify({ date: today, uid: this.ncmUid, song: result })); } catch (e) {}
       return result;
     } catch (e) {
