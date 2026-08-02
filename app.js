@@ -1096,27 +1096,25 @@ class TaskApp {
 
     this._viewingReceiptDate = date;
 
-    // 数据行：左侧分类，右侧数值（像视频里 Messages handled / Meeting hours 那样）
-    const skincareDone = SKINCARE_CATEGORIES.filter(c => {
-      const day = this.skincareDates[date];
-      return day && day[c.key];
-    }).length;
+    // 数据行：把每一条完成的任务单独列出来；护肤展开成具体项目；拉粑粑和总完成率保留
     const poopDone = this.poopDates.includes(date) ? 1 : 0;
+    const skincareDay = this.skincareDates[date] || {};
+    const rows = [];
 
-    const rows = [
-      { label: '每日必做完成', value: `${routineDone.length}/${allRoutine || '-'}` },
-      { label: '今日限定完成', value: `${limitedDone.length}/${allLimited || '-'}` },
-      { label: '子任务完成', value: `${subDone.length}/${allSub || '-'}` },
-      { label: '护肤打卡', value: skincareDone + ' 项' },
-      { label: '拉粑粑记录', value: poopDone ? '✓' : '-' },
-      { label: '总完成率', value: rate + '%' }
-    ];
+    routineDone.forEach(i => rows.push({ label: i.title, value: '✓', tag: 'ROUTINE' }));
+    limitedDone.forEach(i => rows.push({ label: i.title, value: '✓', tag: 'TODAY' }));
+    subDone.forEach(s => rows.push({ label: s.title, value: '✓', tag: 'TASK' }));
+    SKINCARE_CATEGORIES.forEach(c => {
+      if (skincareDay[c.key]) rows.push({ label: c.label, value: '✓', tag: 'SKINCARE' });
+    });
+    rows.push({ label: '拉粑粑记录', value: poopDone ? '✓' : '-' });
+    rows.push({ label: '总完成率', value: rate + '%' });
 
-    const itemsHtml = totalItems === 0
+    const itemsHtml = totalItems === 0 && rows.length <= 2
       ? '<div class="receipt-empty">今日暂无完成记录 🥲<br>做一件小事，再回来开票吧～</div>'
       : rows.map((r, idx) => `
-        <div class="receipt-row-data" style="animation-delay:${360 + idx * 70}ms">
-          <span class="receipt-row-label">${r.label}</span>
+        <div class="receipt-row-data" style="animation-delay:${360 + idx * 60}ms">
+          <span class="receipt-row-label">${this.escapeHtml(r.label)}</span>
           <span class="receipt-row-dots"></span>
           <span class="receipt-row-value">${r.value}</span>
         </div>
@@ -1132,12 +1130,44 @@ class TaskApp {
     document.getElementById('receipt-rate').textContent = rate + '%';
     document.getElementById('receipt-barcode').innerHTML = this.barcodeSvg(date);
     document.getElementById('receipt-modal').style.display = 'flex';
+    // 播放打印音效
+    this.playPrinterSound();
     // 异步加载「今日歌曲」封面 + 歌词（不阻塞小票弹出）
     this.renderReceiptMusic(date);
   }
 
   closeReceipt() {
     document.getElementById('receipt-modal').style.display = 'none';
+  }
+
+  // 播放「小票打印」音效（Web Audio API 生成点阵打印机的咔嗒声）
+  playPrinterSound() {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const now = ctx.currentTime;
+      const len = Math.floor(ctx.sampleRate * 1.2);
+      const buffer = ctx.createBuffer(1, len, ctx.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < len; i++) data[i] = Math.random() * 2 - 1;
+
+      const bursts = 36;
+      for (let i = 0; i < bursts; i++) {
+        const src = ctx.createBufferSource();
+        src.buffer = buffer;
+        const gain = ctx.createGain();
+        const t = now + i * 0.032 + Math.random() * 0.008;
+        const dur = 0.012 + Math.random() * 0.018;
+        gain.gain.setValueAtTime(0, t);
+        gain.gain.linearRampToValueAtTime(0.13, t + 0.004);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + dur);
+        src.connect(gain);
+        gain.connect(ctx.destination);
+        src.start(t, Math.random() * 0.8, dur);
+      }
+      setTimeout(() => ctx.close(), 1600);
+    } catch (e) {}
   }
 
   // ===== 网易云「今日歌曲」 =====
@@ -1219,13 +1249,13 @@ class TaskApp {
     }
   }
 
-  pixelateCover(proxiedUrl, size = 48) {
+  pixelateCover(proxiedUrl, size = 80) {
     return new Promise((resolve) => {
       const img = new Image();
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         try {
-          // 1) 缩到像素网格，用灰度+对比度增强营造更清晰的黑白像素
+          // 1) 缩到更密的像素网格
           const small = document.createElement('canvas');
           small.width = size; small.height = size;
           const sctx = small.getContext('2d');
@@ -1233,15 +1263,24 @@ class TaskApp {
           sctx.drawImage(img, 0, 0, size, size);
           const px = sctx.getImageData(0, 0, size, size);
           const d = px.data;
-          for (let i = 0; i < d.length; i += 4) {
-            const r = d[i], g = d[i + 1], b = d[i + 2];
-            // 灰度
-            let gray = 0.299 * r + 0.587 * g + 0.114 * b;
-            // 提升对比度
-            gray = (gray - 128) * 1.25 + 128;
-            // 阈值：纯黑白二值化
-            const v = gray > 145 ? 245 : 18;
-            d[i] = d[i + 1] = d[i + 2] = v;
+
+          // 4x4 Bayer 有序抖动，让灰度过渡更自然、封面更易辨认
+          const bayer = [
+            [0, 8, 2, 10],
+            [12, 4, 14, 6],
+            [3, 11, 1, 9],
+            [15, 7, 13, 5]
+          ];
+          for (let y = 0; y < size; y++) {
+            for (let x = 0; x < size; x++) {
+              const i = (y * size + x) * 4;
+              const r = d[i], g = d[i + 1], b = d[i + 2];
+              let gray = 0.299 * r + 0.587 * g + 0.114 * b;
+              gray = (gray - 128) * 1.2 + 128;
+              const threshold = ((bayer[y % 4][x % 4] + 0.5) / 16) * 255;
+              const v = gray > threshold ? 245 : 18;
+              d[i] = d[i + 1] = d[i + 2] = v;
+            }
           }
           sctx.putImageData(px, 0, 0);
 
@@ -1267,7 +1306,7 @@ class TaskApp {
     const song = await this.getSongOfDay();
     if (!song) { el.style.display = 'none'; return; }
     const proxied = this.buildProxiedCoverUrl(song.coverUrl);
-    const pixel = await this.pixelateCover(proxied, 48);
+    const pixel = await this.pixelateCover(proxied, 80);
     el.style.display = 'block';
     const lyricHtml = song.lyric
       ? `<div class="receipt-music-lyric">“${this.escapeHtml(song.lyric)}”</div>`
