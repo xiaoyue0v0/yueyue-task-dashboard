@@ -4,6 +4,11 @@ const SYNC_REMOTE_KEY = 'yueyue-last-remote';
 const NCM_UID_KEY = 'yueyue-ncm-uid';
 const NCM_CACHE_KEY = 'yueyue-ncm-cache';
 
+// Netlify functions 地址：在 Netlify 域名下用相对路径；在 GitHub Pages 等其他托管下用绝对路径（指向已部署的 Netlify 站点）
+const NCM_FUNC_BASE = (location.hostname.endsWith('netlify.app') || location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+  ? '/.netlify/functions'
+  : 'https://stupendous-speculoos-f67e0f.netlify.app/.netlify/functions';
+
 // ===== 云端同步配置（Supabase 免费版）=====
 // 把下面两个值替换成你在 supabase.com 项目里拿到的
 // Project URL 和 anon public key（anon key 设计上可安全放前端）
@@ -1505,7 +1510,7 @@ class TaskApp {
   }
 
   buildProxiedCoverUrl(coverUrl) {
-    return `/.netlify/functions/ncm-cover?url=${encodeURIComponent(coverUrl)}`;
+    return `${NCM_FUNC_BASE}/ncm-cover?url=${encodeURIComponent(coverUrl)}`;
   }
 
   // 按日期缓存 key
@@ -1536,7 +1541,7 @@ class TaskApp {
       song = cache.song;
     } else {
       try {
-        const resp = await fetch(`/.netlify/functions/ncm?uid=${encodeURIComponent(this.ncmUid)}`);
+        const resp = await fetch(`${NCM_FUNC_BASE}/ncm?uid=${encodeURIComponent(this.ncmUid)}`);
         const data = await resp.json();
         if (!data.ok || !data.list || !data.list.length) {
           const status = document.getElementById('ncm-status');
@@ -1558,7 +1563,7 @@ class TaskApp {
     // 歌词缺失则补取（兼容旧缓存 / 首次拉取失败 / 后端列表缓存拦截）
     if (song && !song.lyric) {
       try {
-        const lr = await fetch(`/.netlify/functions/ncm?uid=${encodeURIComponent(this.ncmUid)}&songId=${encodeURIComponent(song.id)}`);
+        const lr = await fetch(`${NCM_FUNC_BASE}/ncm?uid=${encodeURIComponent(this.ncmUid)}&songId=${encodeURIComponent(song.id)}`);
         const ld = await lr.json();
         if (ld.ok && ld.lyric) {
           song = Object.assign({}, song, { lyric: ld.lyric });
