@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
   <title>悦悦回国任务台</title>
-  <link rel="stylesheet" href="style.css?v=37">
+  <link rel="stylesheet" href="style.css?v=38">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐿️%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -617,8 +617,20 @@
     </div>
   </div>
 
+  <!-- 悬浮便签纸：在所有工作台之上，一键打开/收起，可随意记录 -->
+  <div id="sticky-note" class="sticky-note collapsed">
+    <button id="sticky-toggle" class="sticky-toggle" aria-label="打开便签">📝</button>
+    <div class="sticky-panel">
+      <div class="sticky-header">
+        <span class="sticky-title">随手记</span>
+        <button id="sticky-close" class="sticky-close" aria-label="收起便签">×</button>
+      </div>
+      <textarea id="sticky-text" class="sticky-text" placeholder="在这里随便写点什么…（自动保存）"></textarea>
+    </div>
+  </div>
+
   <script src="supabase.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.4/dist/dom-to-image-more.min.js"></script>
-  <script src="app.js?v=37"></script>
+  <script src="app.js?v=38"></script>
 </body>
 </html>
