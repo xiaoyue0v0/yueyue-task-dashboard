@@ -2667,7 +2667,7 @@ input::placeholder, textarea::placeholder {
 
 .receipt-actions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
   justify-content: center;
   margin-top: 18px;
   padding-top: 14px;
@@ -2675,17 +2675,18 @@ input::placeholder, textarea::placeholder {
 }
 
 .receipt-btn {
-  flex: 1;
-  max-width: 160px;
-  padding: 10px 14px;
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 10px 6px;
   border-radius: 6px;
   border: 2px solid #1a1a1a;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
   font-family: var(--font-pixel);
   min-height: 44px;
+  white-space: nowrap;
 }
 
 .receipt-btn-primary {
