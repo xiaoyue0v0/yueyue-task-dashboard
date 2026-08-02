@@ -2566,6 +2566,23 @@ input::placeholder, textarea::placeholder {
   line-height: 1.4;
 }
 
+.receipt-review {
+  text-align: center;
+  font-size: 9px;
+  line-height: 1.7;
+  color: #1a1a1a;
+  font-family: var(--font-pixel);
+  margin: 6px 8px 10px;
+  padding: 8px 10px;
+  border: 1px dashed #888;
+  background: #fff;
+  min-height: 34px;
+  word-break: break-word;
+}
+.receipt-review:empty {
+  display: none;
+}
+
 .receipt-barcode {
   margin: 4px 0 14px;
 }
