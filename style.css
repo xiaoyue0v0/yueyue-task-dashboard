@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=ZCOOL+KuaiLe&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&family=ZCOOL+KuaiLe&display=swap');
 
 :root {
   --bg: #f5f7fa;
@@ -17,6 +17,8 @@
 
   /* 像素风字体栈（小票专用） */
   --font-pixel: "Press Start 2P", "ZCOOL KuaiLe", "Courier New", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", monospace;
+  /* 更窄更清晰的像素数字/英文字体（合计行用） */
+  --font-total: "VT323", "Press Start 2P", "Courier New", monospace;
 }
 
 * {
@@ -2568,13 +2570,23 @@ input::placeholder, textarea::placeholder {
   border-top: 1px dashed #b9b3a4;
 }
 .receipt-totals .receipt-total-row {
-  padding: 4px 0;
+  padding: 5px 0;
+  font-family: var(--font-total);
+  font-size: 13px;
+  line-height: 1.25;
+  justify-content: center;
+  text-align: center;
 }
 .receipt-totals .receipt-row-label {
   font-weight: 600;
+  white-space: nowrap;
+  max-width: none;
+  flex: 0 0 auto;
+  text-align: center;
 }
+.receipt-totals .receipt-row-dots,
 .receipt-totals .receipt-row-value {
-  font-weight: 600;
+  display: none;
 }
 
 /* 今日未完成：□方框 + 淡色小字 + 缩进 */
