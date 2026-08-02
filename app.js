@@ -398,6 +398,14 @@ class TaskApp {
     this.collapsedCategories = new Set();
     this.currentView = 'today';
     this.recordSub = 'hub';
+    // 计划工作台状态
+    const savedCat = localStorage.getItem('yueyue-ws-category');
+    this.selectedCategoryId = (savedCat && CATEGORIES.includes(savedCat)) ? savedCat : CATEGORIES[1];
+    this.workspaceSearchQuery = '';
+    this.workspaceFilters = JSON.parse(localStorage.getItem('yueyue-ws-filters') || '{}');
+    this.sidebarCollapsed = localStorage.getItem('yueyue-ws-sidebar') === '1';
+    this.expandedWorkspaceTaskId = null;
+    this.filterPopoverOpen = false;
     this.todayFilter = 'all';
     this.todayViewDate = this.todayStr();
     this.todayCalendarMonth = new Date();
@@ -437,7 +445,14 @@ class TaskApp {
     });
 
     window.addEventListener('resize', () => this.handleResize());
-    window.addEventListener('keydown', (e) => { if (e.key === 'Escape') this.closeTopModal(); });
+    window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') this.closeTopModal();
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        const search = document.getElementById('workspace-search');
+        if (search && this.currentView === 'plan') search.focus();
+      }
+    });
     this.initStickyNote();
     this.autoConnect();
   }
@@ -559,6 +574,7 @@ class TaskApp {
   // View switching
   switchView(view) {
     this.currentView = view;
+    document.body.classList.toggle('plan-active', view === 'plan');
     // 同时高亮顶部标签栏与底部导航栏（共用 data-view 属性）
     document.querySelectorAll('[data-view]').forEach(el => {
       el.classList.toggle('active', el.getAttribute('data-view') === view);
@@ -582,8 +598,7 @@ class TaskApp {
     if (empty) empty.style.display = 'none';
 
     if (this.currentView === 'plan') {
-      this.renderTasks();
-      this.renderScheduleCalendar();
+      this.renderWorkspace();
     } else if (this.currentView === 'today') {
       this.renderTodayView();
     } else if (this.currentView === 'record') {
@@ -591,6 +606,413 @@ class TaskApp {
     } else if (this.currentView === 'receipt') {
       this.renderReceiptView();
     }
+  }
+
+  // ===== 计划工作台（新版三栏布局）=====
+  renderWorkspace() {
+    this.renderWorkspaceToolbar();
+    this.renderWorkspaceCategories();
+    this.renderScheduleCalendar(); // 复用现有月/周历渲染
+    this.renderWorkspaceDetail();
+    this.updateFilterBadge();
+  }
+
+  renderWorkspaceToolbar() {
+    const titleEl = document.getElementById('workspace-calendar-title');
+    if (titleEl) {
+      if (this.calendarMode === 'month') {
+        const y = this.currentMonth.getFullYear();
+        const m = this.currentMonth.getMonth() + 1;
+        titleEl.textContent = `${y}年${m}月`;
+      } else {
+        const start = new Date(this.currentWeekStart);
+        const end = new Date(start);
+        end.setDate(end.getDate() + 6);
+        titleEl.textContent = `${this.formatDateSimple(start)} - ${this.formatDateSimple(end)}`;
+      }
+    }
+    const searchInput = document.getElementById('workspace-search');
+    if (searchInput && document.activeElement !== searchInput) {
+      searchInput.value = this.workspaceSearchQuery;
+    }
+    document.getElementById('ws-view-month')?.classList.toggle('active', this.calendarMode === 'month');
+    document.getElementById('ws-view-week')?.classList.toggle('active', this.calendarMode === 'week');
+  }
+
+  renderWorkspaceCategories() {
+    const container = document.getElementById('workspace-category-list');
+    const sidebar = document.getElementById('workspace-sidebar');
+    if (!container || !sidebar) return;
+
+    sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
+
+    const cats = CATEGORIES.slice(1);
+    container.innerHTML = cats.map(cat => {
+      const tasks = this.tasks.filter(t => t.category === cat);
+      const totalSub = tasks.reduce((sum, t) => sum + t.subtasks.length, 0);
+      const doneSub = tasks.reduce((sum, t) => sum + t.subtasks.filter(s => s.status === 'done').length, 0);
+      const progress = totalSub === 0 ? (tasks.every(t => t.status === 'done') ? 100 : 0) : Math.round(doneSub / totalSub * 100);
+      const active = this.selectedCategoryId === cat;
+
+      if (this.sidebarCollapsed) {
+        return `
+          <button class="workspace-category-card ${active ? 'active' : ''}" onclick="app.selectCategory('${cat}')" title="${cat} · ${tasks.length} 个任务">
+            <span class="category-card-icon">${this.categoryIcon(cat)}</span>
+          </button>
+        `;
+      }
+
+      return `
+        <button class="workspace-category-card ${active ? 'active' : ''}" onclick="app.selectCategory('${cat}')">
+          <span class="category-card-icon">${this.categoryIcon(cat)}</span>
+          <span class="category-card-info">
+            <div class="category-card-name">${cat}</div>
+            <div class="category-card-count">${tasks.length} 个任务 · ${doneSub}/${totalSub || tasks.length} 完成</div>
+            <div class="category-card-progress"><div class="category-card-progress-fill" style="width:${progress}%"></div></div>
+          </span>
+          <span class="category-card-arrow">›</span>
+        </button>
+      `;
+    }).join('');
+  }
+
+  renderWorkspaceDetail() {
+    const header = document.getElementById('workspace-detail-header');
+    const focus = document.getElementById('workspace-detail-focus');
+    const tasks = document.getElementById('workspace-detail-tasks');
+    if (!header || !focus || !tasks) return;
+
+    const cat = this.selectedCategoryId;
+    const allCatTasks = this.tasks.filter(t => t.category === cat);
+    const filtered = this.getWorkspaceFilteredTasks(allCatTasks);
+    const totalSub = allCatTasks.reduce((sum, t) => sum + t.subtasks.length, 0);
+    const doneSub = allCatTasks.reduce((sum, t) => sum + t.subtasks.filter(s => s.status === 'done').length, 0);
+    const progress = totalSub === 0 ? (allCatTasks.every(t => t.status === 'done') ? 100 : 0) : Math.round(doneSub / totalSub * 100);
+
+    header.innerHTML = `
+      <div class="detail-header-top">
+        <div class="detail-title-row">
+          <span class="detail-icon">${this.categoryIcon(cat)}</span>
+          <div class="detail-title-text">
+            <h3>${cat}</h3>
+            <p>${allCatTasks.length} 个任务 · ${doneSub}/${totalSub || allCatTasks.length} 完成 · 进度 ${progress}%</p>
+          </div>
+        </div>
+        <div class="detail-actions">
+          <button title="折叠面板" onclick="app.toggleDetailPanel()">▾</button>
+          <button title="编辑分类" onclick="app.editCategory()">✎</button>
+          <button title="更多" onclick="app.openCategoryMenu()">⋮</button>
+        </div>
+      </div>
+    `;
+
+    // 今日重点：选中分类里今天的子任务 / 今日待办相关
+    const today = this.todayStr();
+    const focusTasks = filtered.filter(t =>
+      t.subtasks.some(s => s.date === today && s.status !== 'done') ||
+      (t.status !== 'done' && t.subtasks.some(s => s.date === today))
+    ).slice(0, 3);
+
+    if (focusTasks.length === 0) {
+      focus.innerHTML = `
+        <div class="detail-section-title"><span>今日重点</span></div>
+        <div class="detail-empty">
+          今天还没有重点任务<br>
+          <button onclick="app.openTaskModalForSelectedCategory()">+ 添加今日重点</button>
+        </div>
+      `;
+    } else {
+      focus.innerHTML = `
+        <div class="detail-section-title"><span>今日重点</span><span>${focusTasks.length}</span></div>
+        ${focusTasks.map(t => this.renderCompactTaskRow(t)).join('')}
+      `;
+    }
+
+    // 全部任务
+    const sorted = [...filtered].sort((a, b) => {
+      const order = { 'P0': 0, 'P1': 1, 'P2': 2 };
+      const pa = order[a.priority] ?? 3;
+      const pb = order[b.priority] ?? 3;
+      if (pa !== pb) return pa - pb;
+      return (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0);
+    });
+
+    tasks.innerHTML = `
+      <div class="detail-section-title"><span>全部任务</span><span>${sorted.length}</span></div>
+      ${sorted.length === 0 ? '<div class="detail-empty">没有匹配的任务</div>' : sorted.map(t => this.renderCompactTaskRow(t)).join('')}
+    `;
+  }
+
+  renderCompactTaskRow(task) {
+    const total = task.subtasks.length;
+    const done = task.subtasks.filter(s => s.status === 'done').length;
+    const progress = total === 0 ? (task.status === 'done' ? 100 : 0) : Math.round(done / total * 100);
+    const isExpanded = this.expandedWorkspaceTaskId === task.id;
+    const today = this.todayStr();
+    const hasToday = task.subtasks.some(s => s.date === today);
+    const dateText = hasToday ? '今天' : (task.subtasks.find(s => s.date)?.date || '未排期');
+
+    return `
+      <div class="compact-task-row ${isExpanded ? 'expanded' : ''}" onclick="app.toggleWorkspaceTaskExpand('${task.id}')">
+        <div class="compact-task-checkbox ${task.status === 'done' ? 'checked' : ''}" onclick="event.stopPropagation(); app.toggleTaskStatus('${task.id}')">
+          ${task.status === 'done' ? '✓' : ''}
+        </div>
+        <div class="compact-task-main">
+          <div class="compact-task-title ${task.status === 'done' ? 'done' : ''}">${this.escapeHtml(task.title)}</div>
+          <div class="compact-task-meta">
+            <span class="ws-tag ws-tag-${task.priority.toLowerCase()}">${task.priority}</span>
+            <span class="ws-tag ws-tag-${task.status}">${this.statusText(task.status)}</span>
+            <span>${progress}% · ${done}/${total || 1} 完成</span>
+          </div>
+        </div>
+        <div class="compact-task-date">${dateText}</div>
+        <div class="compact-task-actions" onclick="event.stopPropagation()">
+          <button title="编辑" onclick="app.openTaskModal('${task.id}')">✎</button>
+          <button title="删除" onclick="app.deleteTask('${task.id}')">🗑</button>
+        </div>
+        ${isExpanded ? this.renderCompactTaskExpand(task) : ''}
+      </div>
+    `;
+  }
+
+  renderCompactTaskExpand(task) {
+    const subHtml = task.subtasks.map(sub => `
+      <div class="subtask-item" draggable="true" ondragstart="app.handleDragStart(event, '${task.id}', '${sub.id}')" ondragend="app.handleDragEnd(event)">
+        <span class="drag-handle">⋮⋮</span>
+        <div class="subtask-checkbox ${sub.status === 'done' ? 'checked' : ''}" onclick="app.toggleSubtask('${task.id}', '${sub.id}')">
+          ${sub.status === 'done' ? '✓' : ''}
+        </div>
+        <span class="subtask-title ${sub.status === 'done' ? 'done' : ''}">${this.escapeHtml(sub.title)}</span>
+        ${sub.date ? `<span class="subtask-date">📅 ${sub.date}</span>` : ''}
+        <div class="subtask-actions" onclick="event.stopPropagation()">
+          <button class="icon-btn" title="编辑" onclick="app.openSubtaskModal('${task.id}', '${sub.id}')">✏️</button>
+          <button class="icon-btn" title="删除" onclick="app.deleteSubtask('${task.id}', '${sub.id}')">🗑️</button>
+        </div>
+      </div>
+    `).join('');
+
+    return `
+      <div class="compact-task-expand" onclick="event.stopPropagation()">
+        ${task.notes ? `<div class="task-notes" style="margin-bottom:10px;">${this.escapeHtml(task.notes)}</div>` : ''}
+        <div class="subtask-list">
+          ${subHtml || '<div style="color:var(--text-secondary);font-size:13px;">暂无子任务</div>'}
+        </div>
+        <button class="add-subtask" onclick="app.openSubtaskModal('${task.id}')">+ 添加子任务</button>
+      </div>
+    `;
+  }
+
+  selectCategory(cat) {
+    this.selectedCategoryId = cat;
+    localStorage.setItem('yueyue-ws-category', cat);
+    this.expandedWorkspaceTaskId = null;
+    this.renderWorkspaceCategories();
+    this.renderWorkspaceDetail();
+    // 在移动端打开右侧抽屉
+    const detail = document.getElementById('workspace-detail');
+    if (detail && window.innerWidth <= 1024) detail.classList.add('open');
+  }
+
+  toggleSidebarCollapsed() {
+    this.sidebarCollapsed = !this.sidebarCollapsed;
+    localStorage.setItem('yueyue-ws-sidebar', this.sidebarCollapsed ? '1' : '0');
+    this.renderWorkspaceCategories();
+  }
+
+  toggleWorkspaceTaskExpand(taskId) {
+    this.expandedWorkspaceTaskId = this.expandedWorkspaceTaskId === taskId ? null : taskId;
+    this.renderWorkspaceDetail();
+  }
+
+  handleWorkspaceSearch(query) {
+    this.workspaceSearchQuery = query.trim().toLowerCase();
+    this.renderWorkspaceDetail();
+  }
+
+  toggleFilterPopover(event) {
+    event && event.stopPropagation();
+    const popover = document.getElementById('filter-popover');
+    const btn = document.getElementById('workspace-filter-btn');
+    if (!popover || !btn) return;
+
+    this.filterPopoverOpen = !this.filterPopoverOpen;
+    popover.style.display = this.filterPopoverOpen ? 'block' : 'none';
+    btn.setAttribute('aria-expanded', this.filterPopoverOpen ? 'true' : 'false');
+
+    if (this.filterPopoverOpen) {
+      this.renderFilterPopover();
+      const rect = btn.getBoundingClientRect();
+      popover.style.top = (rect.bottom + 8) + 'px';
+      popover.style.left = Math.min(rect.left, window.innerWidth - 300) + 'px';
+      const close = (e) => { if (!popover.contains(e.target) && e.target !== btn) { this.closeFilterPopover(); document.removeEventListener('click', close); } };
+      setTimeout(() => document.addEventListener('click', close), 0);
+    }
+  }
+
+  closeFilterPopover() {
+    this.filterPopoverOpen = false;
+    const popover = document.getElementById('filter-popover');
+    const btn = document.getElementById('workspace-filter-btn');
+    if (popover) popover.style.display = 'none';
+    if (btn) btn.setAttribute('aria-expanded', 'false');
+  }
+
+  renderFilterPopover() {
+    const filters = this.workspaceFilters;
+    const catContainer = document.getElementById('ws-filter-categories');
+    const priContainer = document.getElementById('ws-filter-priorities');
+    const statusContainer = document.getElementById('ws-filter-status');
+    const dateContainer = document.getElementById('ws-filter-dates');
+
+    if (catContainer) {
+      catContainer.innerHTML = CATEGORIES.map(cat => `
+        <button class="${filters.category === cat ? 'active' : ''}" onclick="app.setWorkspaceFilter('category', '${cat}')">${cat}</button>
+      `).join('');
+    }
+    if (priContainer) {
+      priContainer.innerHTML = PRIORITIES.map(pri => `
+        <button class="${filters.priority === pri ? 'active' : ''}" onclick="app.setWorkspaceFilter('priority', '${pri}')">${pri}</button>
+      `).join('');
+    }
+    if (statusContainer) {
+      const statuses = [{k:'全部',v:'all'}, {k:'待办',v:'todo'}, {k:'进行中',v:'doing'}, {k:'已完成',v:'done'}];
+      statusContainer.innerHTML = statuses.map(s => `
+        <button class="${filters.status === s.v ? 'active' : ''}" onclick="app.setWorkspaceFilter('status', '${s.v}')">${s.k}</button>
+      `).join('');
+    }
+    if (dateContainer) {
+      const dates = [{k:'全部',v:'all'}, {k:'有截止日期',v:'dated'}, {k:'今日重点',v:'today'}];
+      dateContainer.innerHTML = dates.map(d => `
+        <button class="${filters.dateRange === d.v ? 'active' : ''}" onclick="app.setWorkspaceFilter('dateRange', '${d.v}')">${d.k}</button>
+      `).join('');
+    }
+  }
+
+  setWorkspaceFilter(key, value) {
+    const filters = this.workspaceFilters;
+    if ((key === 'category' && value === '全部') ||
+        (key === 'priority' && value === '全部') ||
+        ((key === 'status' || key === 'dateRange') && value === 'all')) {
+      delete filters[key];
+    } else {
+      filters[key] = value;
+    }
+    localStorage.setItem('yueyue-ws-filters', JSON.stringify(filters));
+    this.renderFilterPopover();
+    this.renderWorkspaceDetail();
+    this.updateFilterBadge();
+  }
+
+  clearWorkspaceFilters() {
+    this.workspaceFilters = {};
+    localStorage.setItem('yueyue-ws-filters', '{}');
+    this.renderFilterPopover();
+    this.renderWorkspaceDetail();
+    this.updateFilterBadge();
+  }
+
+  updateFilterBadge() {
+    const badge = document.getElementById('workspace-filter-badge');
+    if (!badge) return;
+    const count = Object.keys(this.workspaceFilters).length;
+    if (count > 0) {
+      badge.textContent = count;
+      badge.style.display = 'inline-flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  getWorkspaceFilteredTasks(tasks) {
+    const q = this.workspaceSearchQuery;
+    const f = this.workspaceFilters;
+    const today = this.todayStr();
+    return tasks.filter(t => {
+      if (f.category && f.category !== '全部' && t.category !== f.category) return false;
+      if (f.priority && f.priority !== '全部' && t.priority !== f.priority) return false;
+      if (f.status && f.status !== 'all' && t.status !== f.status) return false;
+      if (f.dateRange === 'dated' && !t.subtasks.some(s => s.date)) return false;
+      if (f.dateRange === 'today' && !t.subtasks.some(s => s.date === today)) return false;
+      if (!q) return true;
+      return t.title.toLowerCase().includes(q) ||
+             t.notes.toLowerCase().includes(q) ||
+             t.subtasks.some(s => s.title.toLowerCase().includes(q));
+    });
+  }
+
+  openTaskModalForSelectedCategory() {
+    this.openTaskModal(null, this.selectedCategoryId);
+  }
+
+  addCategory() {
+    const name = prompt('请输入新分类名称：');
+    if (!name || !name.trim()) return;
+    const cat = name.trim();
+    if (CATEGORIES.includes(cat)) {
+      alert('该分类已存在');
+      return;
+    }
+    CATEGORIES.push(cat);
+    this.selectCategory(cat);
+    this.saveData();
+    this.renderWorkspace();
+  }
+
+  editCategory() {
+    const oldName = this.selectedCategoryId;
+    const newName = prompt('修改分类名称：', oldName);
+    if (!newName || newName.trim() === '' || newName.trim() === oldName) return;
+    const name = newName.trim();
+    if (CATEGORIES.includes(name)) { alert('分类已存在'); return; }
+    const idx = CATEGORIES.indexOf(oldName);
+    if (idx > -1) CATEGORIES[idx] = name;
+    this.tasks.forEach(t => { if (t.category === oldName) t.category = name; });
+    this.selectedCategoryId = name;
+    localStorage.setItem('yueyue-ws-category', name);
+    this.saveData();
+    this.renderWorkspace();
+  }
+
+  openCategoryMenu() {
+    if (confirm(`确定删除分类「${this.selectedCategoryId}」吗？该分类下的任务不会被删除，但会变为未分类。`)) {
+      const idx = CATEGORIES.indexOf(this.selectedCategoryId);
+      if (idx > -1) CATEGORIES.splice(idx, 1);
+      this.selectedCategoryId = CATEGORIES[1] || CATEGORIES[0] || '全部';
+      localStorage.setItem('yueyue-ws-category', this.selectedCategoryId);
+      this.saveData();
+      this.renderWorkspace();
+    }
+  }
+
+  toggleDetailPanel() {
+    const detail = document.getElementById('workspace-detail');
+    if (!detail) return;
+    if (window.innerWidth <= 1024) {
+      detail.classList.remove('open');
+    } else {
+      detail.style.display = detail.style.display === 'none' ? 'flex' : 'none';
+    }
+  }
+
+  goToTodayCalendar() {
+    this.currentMonth = new Date();
+    this.currentWeekStart = this.getWeekStart(new Date());
+    this.renderWorkspace();
+  }
+
+  openSettingsMenu() {
+    alert('设置菜单：可在此管理导出备份、导入备份、云端同步、网易云音乐等。\n当前版本：v40');
+  }
+
+  toggleTaskStatus(taskId) {
+    const task = this.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    task.status = task.status === 'done' ? 'todo' : 'done';
+    if (task.status === 'done') task.subtasks.forEach(s => s.status = 'done');
+    this.saveData();
+    this.renderWorkspace();
+    this.updateStats();
+    this.syncIfNeeded();
   }
 
   // ===== 记录页（hub / 护肤 / 拉粑粑）=====
@@ -654,9 +1076,15 @@ class TaskApp {
   // Calendar mode
   setCalendarView(mode) {
     this.calendarMode = mode;
-    document.getElementById('view-month').classList.toggle('active', mode === 'month');
-    document.getElementById('view-week').classList.toggle('active', mode === 'week');
-    this.renderScheduleCalendar();
+    document.getElementById('view-month')?.classList.toggle('active', mode === 'month');
+    document.getElementById('view-week')?.classList.toggle('active', mode === 'week');
+    document.getElementById('ws-view-month')?.classList.toggle('active', mode === 'month');
+    document.getElementById('ws-view-week')?.classList.toggle('active', mode === 'week');
+    if (this.currentView === 'plan') {
+      this.renderWorkspace();
+    } else {
+      this.renderScheduleCalendar();
+    }
   }
 
   navigateCalendar(delta) {
@@ -667,7 +1095,11 @@ class TaskApp {
       this.currentWeekStart.setDate(this.currentWeekStart.getDate() + delta * 7);
       this.currentWeekStart = new Date(this.currentWeekStart);
     }
-    this.renderScheduleCalendar();
+    if (this.currentView === 'plan') {
+      this.renderWorkspace();
+    } else {
+      this.renderScheduleCalendar();
+    }
   }
 
   // Schedule Calendar Rendering
@@ -683,7 +1115,11 @@ class TaskApp {
     const container = document.getElementById('calendar-body');
     const year = this.currentMonth.getFullYear();
     const month = this.currentMonth.getMonth();
-    document.getElementById('calendar-title').textContent = `${year}年${month + 1}月`;
+    const titleText = `${year}年${month + 1}月`;
+    const titleEl = document.getElementById('calendar-title');
+    if (titleEl) titleEl.textContent = titleText;
+    const wsTitle = document.getElementById('workspace-calendar-title');
+    if (wsTitle) wsTitle.textContent = titleText;
 
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
@@ -751,8 +1187,11 @@ class TaskApp {
     const start = new Date(this.currentWeekStart);
     const end = new Date(start);
     end.setDate(end.getDate() + 6);
-    document.getElementById('calendar-title').textContent =
-      `${this.formatDateSimple(start)} - ${this.formatDateSimple(end)}`;
+    const titleText = `${this.formatDateSimple(start)} - ${this.formatDateSimple(end)}`;
+    const titleEl = document.getElementById('calendar-title');
+    if (titleEl) titleEl.textContent = titleText;
+    const wsTitle = document.getElementById('workspace-calendar-title');
+    if (wsTitle) wsTitle.textContent = titleText;
 
     let html = '<div class="week-view">';
     for (let i = 0; i < 7; i++) {
@@ -2474,17 +2913,21 @@ class TaskApp {
     return result;
   }
 
-  // Filters
+  // Filters（旧版 plan 视图用，新版工作台已改用 renderFilterPopover）
   renderFilters() {
     const catContainer = document.getElementById('category-filters');
-    catContainer.innerHTML = CATEGORIES.map(cat => `
-      <button class="filter-btn ${this.filterCategory === cat ? 'active' : ''}" onclick="app.setCategoryFilter('${cat}')">${cat}</button>
-    `).join('');
+    if (catContainer) {
+      catContainer.innerHTML = CATEGORIES.map(cat => `
+        <button class="filter-btn ${this.filterCategory === cat ? 'active' : ''}" onclick="app.setCategoryFilter('${cat}')">${cat}</button>
+      `).join('');
+    }
 
     const priContainer = document.getElementById('priority-filters');
-    priContainer.innerHTML = PRIORITIES.map(pri => `
-      <button class="filter-btn ${this.filterPriority === pri ? 'active' : ''}" onclick="app.setPriorityFilter('${pri}')">${pri}</button>
-    `).join('');
+    if (priContainer) {
+      priContainer.innerHTML = PRIORITIES.map(pri => `
+        <button class="filter-btn ${this.filterPriority === pri ? 'active' : ''}" onclick="app.setPriorityFilter('${pri}')">${pri}</button>
+      `).join('');
+    }
   }
 
   setCategoryFilter(cat) {
@@ -2517,23 +2960,25 @@ class TaskApp {
     });
   }
 
-  // Task List
+  // Task List（旧版 plan 视图用，新版工作台已改用 renderWorkspaceDetail）
   renderTasks() {
     const leftContainer = document.getElementById('task-list-left');
     const rightContainer = document.getElementById('task-list-right');
     const emptyState = document.getElementById('empty-state');
     const mainLayout = document.getElementById('main-layout');
+    if (!leftContainer || !rightContainer || !mainLayout) return;
+
     const filtered = this.getFilteredTasks();
 
     if (filtered.length === 0) {
       leftContainer.innerHTML = '';
       rightContainer.innerHTML = '';
       mainLayout.style.display = 'none';
-      emptyState.style.display = 'block';
+      if (emptyState) emptyState.style.display = 'block';
       return;
     }
 
-    emptyState.style.display = 'none';
+    if (emptyState) emptyState.style.display = 'none';
     mainLayout.style.display = 'grid';
 
     const priorityOrder = { 'P0': 0, 'P1': 1, 'P2': 2 };
@@ -3241,7 +3686,7 @@ class TaskApp {
   }
 
   // Task Modal
-  openTaskModal(taskId = null) {
+  openTaskModal(taskId = null, defaultCategory = null) {
     const modal = document.getElementById('task-modal');
     const titleEl = document.getElementById('task-modal-title');
     const idEl = document.getElementById('task-id');
@@ -3260,7 +3705,7 @@ class TaskApp {
       titleEl.textContent = '新增任务';
       idEl.value = '';
       document.getElementById('task-title').value = '';
-      document.getElementById('task-category').value = '行政出行';
+      document.getElementById('task-category').value = defaultCategory || '行政出行';
       document.getElementById('task-priority').value = 'P1';
       document.getElementById('task-status').value = 'todo';
       document.getElementById('task-week').value = '';
