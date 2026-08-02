@@ -1399,6 +1399,42 @@ class TaskApp {
     }
   }
 
+  // 将小票导出为 PNG
+  async exportReceiptPng() {
+    if (typeof domtoimage === 'undefined') {
+      alert('导出组件还没准备好，请刷新页面后再试～');
+      return;
+    }
+    const paper = document.querySelector('.receipt-paper');
+    if (!paper) return;
+
+    const closeBtn = paper.querySelector('.receipt-close');
+    const actions = paper.querySelector('.receipt-actions');
+    const prevClose = closeBtn ? closeBtn.style.display : '';
+    const prevActions = actions ? actions.style.display : '';
+    if (closeBtn) closeBtn.style.display = 'none';
+    if (actions) actions.style.display = 'none';
+
+    try {
+      const dataUrl = await domtoimage.toPng(paper, {
+        bgcolor: '#ffffff',
+        scale: 2,
+        style: { margin: '0' }
+      });
+      const date = (this._currentReceiptMusic && this._currentReceiptMusic.date) || this.todayStr();
+      const link = document.createElement('a');
+      link.download = `receipt-${date}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error('导出小票失败', err);
+      alert('导出图片失败：' + (err && err.message ? err.message : '未知错误'));
+    } finally {
+      if (closeBtn) closeBtn.style.display = prevClose;
+      if (actions) actions.style.display = prevActions;
+    }
+  }
+
   // 播放「小票打印」音效（Web Audio API 生成点阵打印机的咔嗒声）
   playPrinterSound() {
     try {
