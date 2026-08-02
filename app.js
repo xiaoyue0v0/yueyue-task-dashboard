@@ -1459,23 +1459,51 @@ class TaskApp {
     return `<svg class="receipt-barcode-svg" viewBox="0 0 300 46" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">${rects}</svg>`;
   }
 
-  // ===== 小票收藏夹 / 托盘（竖向立体堆叠） =====
+  // ===== 小票收藏夹：本周托盘 + 所有日历 =====
   renderReceiptView() {
+    if (!this._receiptTab) this._receiptTab = 'week';
+    // —— 本周托盘 ——
     const tray = document.getElementById('receipt-tray');
     const empty = document.getElementById('receipt-tray-empty');
-    if (!tray) return;
-    const list = [...this.receipts].sort((a, b) => (a.order || 0) - (b.order || 0));
-    if (list.length === 0) {
-      tray.innerHTML = '';
-      empty.style.display = 'block';
-      return;
+    if (tray) {
+      const weekList = [...this.receipts]
+        .sort((a, b) => (a.order || 0) - (b.order || 0))
+        .filter(r => this._isInThisWeek(r.date));
+      if (weekList.length === 0) {
+        tray.innerHTML = '';
+        if (empty) empty.style.display = 'block';
+      } else {
+        if (empty) empty.style.display = 'none';
+        tray.innerHTML = '';
+        weekList.forEach((r, idx) => tray.appendChild(this._createReceiptCard(r, idx)));
+      }
+      if (this._receiptTab === 'week') this._layoutReceiptCards();
     }
-    empty.style.display = 'none';
-    tray.innerHTML = '';
-    list.forEach((r, idx) => {
-      tray.appendChild(this._createReceiptCard(r, idx));
-    });
-    this._layoutReceiptCards();
+    // —— 所有日历 ——
+    if (this._receiptTab === 'all') this.renderReceiptCalendar();
+  }
+
+  switchReceiptTab(tab) {
+    this._receiptTab = tab;
+    const weekTab = document.getElementById('receipt-tab-week');
+    const allTab = document.getElementById('receipt-tab-all');
+    if (weekTab) weekTab.classList.toggle('active', tab === 'week');
+    if (allTab) allTab.classList.toggle('active', tab === 'all');
+    const weekPanel = document.getElementById('receipt-panel-week');
+    const allPanel = document.getElementById('receipt-panel-all');
+    if (weekPanel) weekPanel.style.display = tab === 'week' ? 'block' : 'none';
+    if (allPanel) allPanel.style.display = tab === 'all' ? 'block' : 'none';
+    if (tab === 'all') this.renderReceiptCalendar();
+    else this._layoutReceiptCards();
+  }
+
+  _isInThisWeek(dateStr) {
+    const today = new Date(this.todayStr());
+    const dow = (today.getDay() + 6) % 7; // 周一=0 ... 周日=6
+    const monday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - dow);
+    const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 7);
+    const d = new Date(dateStr);
+    return d >= monday && d < sunday;
   }
 
   _createReceiptCard(r, idx) {
@@ -1487,21 +1515,98 @@ class TaskApp {
     // 兼容旧数据：没有 pixelUrl 时回退到旧的 generatePixelArt
     let imgUrl = r.pixelUrl;
     if (!imgUrl && r.pattern) {
-      const legacy = generatePixelArt(r.date);
-      imgUrl = legacy.dataUrl;
+      try { imgUrl = generatePixelArt(r.date).dataUrl; } catch (e) { imgUrl = ''; }
     }
+    const items = this._receiptCompletedItemTitles(r.date).slice(0, 5);
+    const itemLines = items.length
+      ? items.map(t => `<div class="rs-line"><span class="rs-check">✓</span><span class="rs-text">${this.escapeHtml(t)}</span></div>`).join('')
+      : '<div class="rs-line rs-empty">今日暂无完成记录</div>';
     const div = document.createElement('div');
     div.className = 'receipt-card';
     div.dataset.date = r.date;
     div.dataset.idx = idx;
     div.innerHTML = `
-      <div class="receipt-card-date">${mm}.${dd}</div>
-      <img class="receipt-card-img" src="${imgUrl || ''}" alt="${this.escapeHtml(title)}" draggable="false" />
+      <div class="receipt-card-date">${mm}.${dd} 周${WEEKDAY_NAMES[d.getDay()]}</div>
+      <div class="receipt-card-cover"><img class="receipt-card-img" src="${imgUrl || ''}" alt="${this.escapeHtml(title)}" draggable="false" /></div>
       <div class="receipt-card-title">${this.escapeHtml(title)}</div>
       ${artist ? `<div class="receipt-card-artist">${this.escapeHtml(artist)}</div>` : ''}
+      <div class="receipt-card-rule"></div>
+      <div class="receipt-card-items">${itemLines}</div>
+      <div class="receipt-card-rule"></div>
+      <div class="receipt-card-foot">DAILY RECEIPT</div>
     `;
     this._bindReceiptPointerEvents(div);
     return div;
+  }
+
+  _receiptCompletedItemTitles(date) {
+    const routineDone = this.buildRoutineItems(date).filter(i => i.done);
+    const limitedDone = this.buildLimitedItems(this.getTodayTodos(date)).filter(i => i.done);
+    const subDone = this.getSubtasksByDate(date).filter(s => s.status === 'done');
+    const titles = [];
+    routineDone.forEach(i => titles.push(i.title));
+    limitedDone.forEach(i => titles.push(i.title));
+    subDone.forEach(s => titles.push(s.title));
+    return titles;
+  }
+
+  // ===== 所有小票：日历视图 =====
+  renderReceiptCalendar() {
+    const grid = document.getElementById('receipt-cal-grid');
+    const label = document.getElementById('receipt-cal-label');
+    const weekdaysEl = document.getElementById('receipt-cal-weekdays');
+    const empty = document.getElementById('receipt-cal-empty');
+    if (!grid) return;
+    if (this._receiptCalYear == null) {
+      const now = new Date(this.todayStr());
+      this._receiptCalYear = now.getFullYear();
+      this._receiptCalMonth = now.getMonth();
+    }
+    const year = this._receiptCalYear;
+    const month = this._receiptCalMonth;
+    if (label) label.textContent = `${year} 年 ${month + 1} 月`;
+    if (weekdaysEl && !weekdaysEl.children.length) {
+      weekdaysEl.innerHTML = WEEKDAY_NAMES.map(d => `<div class="receipt-cal-wd">周${d}</div>`).join('');
+    }
+    const map = new Map(this.receipts.map(r => [r.date, r]));
+    const first = new Date(year, month, 1);
+    const startDow = (first.getDay() + 6) % 7; // 周一=0
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const cells = [];
+    for (let i = 0; i < startDow; i++) cells.push(null);
+    for (let day = 1; day <= daysInMonth; day++) {
+      cells.push(map.get(this.formatDate(year, month, day)) || { date: this.formatDate(year, month, day), empty: true });
+    }
+    grid.innerHTML = cells.map(c => {
+      if (!c) return '<div class="receipt-cal-cell receipt-cal-blank"></div>';
+      const day = parseInt(c.date.slice(8, 10), 10);
+      if (c.empty) {
+        return `<div class="receipt-cal-cell receipt-cal-day"><span class="receipt-cal-num">${day}</span></div>`;
+      }
+      let img = c.pixelUrl;
+      if (!img && c.pattern) { try { img = generatePixelArt(c.date).dataUrl; } catch (e) { img = ''; } }
+      const title = this.escapeHtml(c.songName || c.pattern || 'RECEIPT');
+      return `<div class="receipt-cal-cell receipt-cal-filled" data-date="${c.date}" onclick="app.openReceipt('${c.date}')" title="${title}">
+          <img class="receipt-cal-cover" src="${img || ''}" alt="" draggable="false" />
+          <span class="receipt-cal-num">${day}</span>
+        </div>`;
+    }).join('');
+    if (empty) empty.style.display = map.size === 0 ? 'block' : 'none';
+  }
+
+  shiftReceiptCal(dir) {
+    if (this._receiptCalYear == null) {
+      const now = new Date(this.todayStr());
+      this._receiptCalYear = now.getFullYear();
+      this._receiptCalMonth = now.getMonth();
+    }
+    let m = this._receiptCalMonth + dir;
+    let y = this._receiptCalYear;
+    if (m < 0) { m = 11; y--; }
+    if (m > 11) { m = 0; y++; }
+    this._receiptCalYear = y;
+    this._receiptCalMonth = m;
+    this.renderReceiptCalendar();
   }
 
   _layoutReceiptCards() {
@@ -1518,7 +1623,7 @@ class TaskApp {
       const tx = ((seed % 700) / 100) - 3.5;  // -3.5 ~ 3.5 px
       const bottom = baseBottom + idx * stepY;
       card.style.left = '50%';
-      card.style.marginLeft = '-94px';
+      card.style.marginLeft = '-79px';
       card.style.bottom = `${bottom}px`;
       card.style.top = 'auto';
       card.style.transform = `translateX(${tx}px) rotate(${rot}deg)`;
