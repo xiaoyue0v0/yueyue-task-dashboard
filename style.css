@@ -2577,6 +2577,25 @@ input::placeholder, textarea::placeholder {
   font-weight: 600;
 }
 
+/* 今日未完成：□方框 + 淡色小字 + 缩进 */
+.receipt-row-box {
+  font-family: var(--font-pixel);
+  font-size: 11px;
+  color: #000;
+  min-width: 18px;
+  text-align: left;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+.receipt-undone .receipt-row-label {
+  color: #555;
+  font-style: italic;
+  max-width: 110px;
+}
+.receipt-undone .receipt-row-value {
+  min-width: 0;
+}
+
 .receipt-summary {
   font-size: 10px;
   font-family: var(--font-pixel);

@@ -1241,12 +1241,27 @@ class TaskApp {
       groups.push({ title: '护肤记录', items: skincareItems.map(i => ({ label: i.label, qty: 1 })) });
     }
 
-    const hasAnyActivity = routineDone.length || limitedDone.length || subDone.length || poopDone || skincareItems.length;
+    // 今日未完成：任务类（每日必做 / 今日限定 / 子任务）里未完成的项
+    const undoneRoutine = this.buildRoutineItems(date).filter(i => !i.done);
+    const undoneLimited = this.buildLimitedItems(this.getTodayTodos(date)).filter(i => !i.done);
+    const undoneSub = this.getSubtasksByDate(date).filter(s => s.status !== 'done');
+    const hasUndone = undoneRoutine.length || undoneLimited.length || undoneSub.length;
+    if (hasUndone) {
+      const undoneItems = [
+        ...undoneRoutine.map(i => ({ label: i.title, qty: 0, undone: true })),
+        ...undoneLimited.map(i => ({ label: i.title, qty: 0, undone: true })),
+        ...undoneSub.map(s => ({ label: s.title, qty: 0, undone: true }))
+      ];
+      groups.push({ title: '今日未完成', type: 'undone', items: undoneItems });
+    }
+
+    const hasAnyActivity = routineDone.length || limitedDone.length || subDone.length || poopDone || skincareItems.length || hasUndone;
     let d = 0;
     const nextDelay = () => `${360 + d++ * 60}ms`;
     let lineNo = 0;
-    const totalQty = groups.reduce((sum, g) => sum + g.items.reduce((s, i) => s + (i.qty || 0), 0), 0);
-    const totalLines = groups.reduce((sum, g) => sum + g.items.length, 0);
+    const countedGroups = groups.filter(g => g.type !== 'undone');
+    const totalQty = countedGroups.reduce((sum, g) => sum + g.items.reduce((s, i) => s + (i.qty || 0), 0), 0);
+    const totalLines = countedGroups.reduce((sum, g) => sum + g.items.length, 0);
 
     const itemsHtml = !hasAnyActivity
       ? '<div class="receipt-empty">今日暂无完成记录 🥲<br>做一件小事，再回来开票吧～</div>'
@@ -1255,6 +1270,15 @@ class TaskApp {
           <div class="receipt-group-title" style="animation-delay:${nextDelay()}">${g.title}</div>
           <div class="receipt-group-items">
             ${g.items.map(item => {
+              if (g.type === 'undone') {
+                return `
+                <div class="receipt-row-data receipt-row-sub receipt-undone" style="animation-delay:${nextDelay()}">
+                  <span class="receipt-row-box">□</span>
+                  <span class="receipt-row-label">${this.escapeHtml(item.label)}</span>
+                  <span class="receipt-row-dots"></span>
+                  <span class="receipt-row-value"></span>
+                </div>`;
+              }
               const num = String(++lineNo).padStart(2, '0');
               const val = item.qty > 0 ? `x${item.qty}` : '-';
               return `
@@ -1271,14 +1295,14 @@ class TaskApp {
       `).join('') + `
         <div class="receipt-totals" style="animation-delay:${nextDelay()}">
           <div class="receipt-row-data receipt-row-sub receipt-total-row">
-            <span class="receipt-row-label">合计项</span>
+            <span class="receipt-row-label">${totalLines} items recorded</span>
             <span class="receipt-row-dots"></span>
-            <span class="receipt-row-value">${totalLines}项</span>
+            <span class="receipt-row-value"></span>
           </div>
           <div class="receipt-row-data receipt-row-sub receipt-total-row">
-            <span class="receipt-row-label">合计数量</span>
+            <span class="receipt-row-label">tasks ${totalItems}/${allTotal} · ${rate}% completion</span>
             <span class="receipt-row-dots"></span>
-            <span class="receipt-row-value">x${totalQty}</span>
+            <span class="receipt-row-value"></span>
           </div>
         </div>
       `;
@@ -1289,8 +1313,6 @@ class TaskApp {
     document.getElementById('receipt-meta-order').textContent = 'ORDER ' + orderId;
     document.getElementById('receipt-date').textContent = dateLabel + (isToday ? ' · 今日' : '');
     document.getElementById('receipt-body').innerHTML = itemsHtml;
-    document.getElementById('receipt-count').textContent = totalItems;
-    document.getElementById('receipt-rate').textContent = rate + '%';
 
     const review = this.generateDailyReview(date, { routineDone, limitedDone, subDone, poopDone: !!poopDone, skincareItems, rate, totalItems });
     const reviewEl = document.getElementById('receipt-review');
