@@ -1419,14 +1419,15 @@ class TaskApp {
     }
 
     // 克隆到离屏固定宽度容器，避免移动端 max-width:96% 导致截断
+    // 注意：不能用 visibility:hidden —— 它会继承到克隆体，导致导出空白 PNG
     const wrapper = document.createElement('div');
-    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:420px;z-index:-1;overflow:visible;visibility:hidden;';
+    wrapper.style.cssText = 'position:fixed;left:-9999px;top:0;width:420px;z-index:-1;overflow:visible;';
     document.body.appendChild(wrapper);
 
     const clone = paper.cloneNode(true);
     const cloneId = 'receipt-export-clone-' + Date.now();
     clone.id = cloneId;
-    clone.style.cssText = 'width:400px;max-width:none;margin:0;transform:none;animation:none;position:relative;box-shadow:none;overflow:visible;';
+    clone.style.cssText = 'width:400px;max-width:none;margin:0;transform:none;animation:none;position:relative;box-shadow:none;overflow:visible;visibility:visible;';
 
     // 移除导出时不需要的 UI
     const closeBtn = clone.querySelector('.receipt-close');
