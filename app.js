@@ -1457,7 +1457,10 @@ class TaskApp {
       return;
     }
 
-    container.innerHTML = subtasks.map(s => `
+    container.innerHTML = subtasks.map(s => {
+      const parentTask = this.tasks.find(t => t.id === s.taskId);
+      const catClass = parentTask ? `cat-${parentTask.category}` : '';
+      return `
       <div class="today-item ${s.status === 'done' ? 'done' : ''}" onclick="app.openSubtaskModal('${s.taskId}', '${s.id}')">
         <div class="today-item-checkbox ${s.status === 'done' ? 'checked' : ''}" onclick="event.stopPropagation(); app.toggleSubtask('${s.taskId}', '${s.id}')">
           ${s.status === 'done' ? '✓' : ''}
@@ -1465,7 +1468,7 @@ class TaskApp {
         <div class="today-item-content">
           <div class="today-item-title">${this.escapeHtml(s.title)}</div>
           <div class="today-item-meta">
-            <span class="today-item-tag today-tag-parent">${this.escapeHtml(s.taskTitle)}</span>
+            <span class="today-item-tag today-tag-parent ${catClass}">${this.escapeHtml(s.taskTitle)}</span>
           </div>
         </div>
         <div class="today-item-actions" onclick="event.stopPropagation()">
@@ -1473,7 +1476,8 @@ class TaskApp {
           <button class="icon-btn" title="删除" onclick="app.deleteSubtask('${s.taskId}', '${s.id}')">🗑️</button>
         </div>
       </div>
-    `).join('');
+      `;
+    }).join('');
   }
 
   updateTodayProgress(routineItems, limitedItems, subtasks) {

@@ -1706,8 +1706,9 @@ input::placeholder, textarea::placeholder {
 }
 
 .today-tag-parent {
-  background: #dbeafe;
-  color: #1e40af;
+  /* 颜色由动态 cat-{分类} class 控制，与计划工作台一致 */
+  background: #e0e7ff;
+  color: #4338ca;
 }
 
 .today-item-actions {
