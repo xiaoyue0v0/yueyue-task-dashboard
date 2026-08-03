@@ -1706,10 +1706,16 @@ input::placeholder, textarea::placeholder {
 }
 
 .today-tag-parent {
-  /* 颜色由动态 cat-{分类} class 控制，与计划工作台一致 */
+  /* 默认颜色（无分类时兜底） */
   background: #e0e7ff;
   color: #4338ca;
 }
+
+/* 今日子任务标签：分类颜色覆盖默认（双class提高特异性） */
+.today-tag-parent.cat-行政出行 { background: #dbeafe; color: #1e40af; }
+.today-tag-parent.cat-学习成长 { background: #dcfce7; color: #166534; }
+.today-tag-parent.cat-购物消费 { background: #fce7f3; color: #9d174d; }
+.today-tag-parent.cat-生活护理 { background: #fef3c7; color: #92400e; }
 
 .today-item-actions {
   display: flex;
