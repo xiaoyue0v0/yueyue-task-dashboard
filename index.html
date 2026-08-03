@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
   <title>悦悦回国任务台</title>
-  <link rel="stylesheet" href="style.css?v=46">
+  <link rel="stylesheet" href="style.css?v=47">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐿️%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -113,14 +113,6 @@
           </button>
         </aside>
 
-        <main class="workspace-calendar" id="workspace-calendar">
-          <div class="calendar-body" id="calendar-body"></div>
-          <div class="workspace-calendar-hint">
-            <span>💡</span>
-            <span>点击日期可创建任务，拖拽任务可调整日期</span>
-          </div>
-        </main>
-
         <aside class="workspace-detail" id="workspace-detail" onclick="if(this.classList.contains('collapsed')) app.expandDetailPanel()">
           <button class="detail-expand-handle" onclick="event.stopPropagation(); app.expandDetailPanel()" title="展开详情面板">▸</button>
           <div class="detail-header" id="workspace-detail-header"></div>
@@ -128,6 +120,14 @@
           <div class="detail-tasks" id="workspace-detail-tasks"></div>
           <button class="detail-add-btn" onclick="app.openTaskModalForSelectedCategory()">+ 添加任务</button>
         </aside>
+
+        <main class="workspace-calendar" id="workspace-calendar">
+          <div class="calendar-body" id="calendar-body"></div>
+          <div class="workspace-calendar-hint">
+            <span>💡</span>
+            <span>点击日期可创建任务，拖拽任务可调整日期</span>
+          </div>
+        </main>
       </div>
     </section>
 
@@ -723,6 +723,6 @@
 
   <script src="supabase.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.4/dist/dom-to-image-more.min.js"></script>
-  <script src="app.js?v=46"></script>
+  <script src="app.js?v=47"></script>
 </body>
 </html>
