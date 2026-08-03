@@ -1312,8 +1312,6 @@ input::placeholder, textarea::placeholder {
   color: var(--text);
 }
 
-.today-cal-nav-row {
-
 .today-cal-nav {
   width: 26px;
   height: 26px;
