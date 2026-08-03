@@ -1268,15 +1268,42 @@ input::placeholder, textarea::placeholder {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 12px;
-  padding: 14px;
   margin-bottom: 16px;
+  overflow: hidden;
 }
 
-.today-cal-header {
+.today-calendar .today-cal-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s;
+}
+
+.today-calendar .today-cal-header:hover {
+  background: var(--bg);
+}
+
+.today-cal-toggle {
+  font-size: 14px;
+  color: var(--text-secondary);
+  transition: transform 0.2s;
+}
+
+.today-cal-body {
+  padding: 0 14px 14px;
+}
+
+.today-cal-nav-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.today-calendar.collapsed .today-cal-body {
+  display: none;
 }
 
 .today-cal-month {
@@ -1284,6 +1311,8 @@ input::placeholder, textarea::placeholder {
   font-size: 14px;
   color: var(--text);
 }
+
+.today-cal-nav-row {
 
 .today-cal-nav {
   width: 26px;
@@ -1541,9 +1570,16 @@ input::placeholder, textarea::placeholder {
 }
 
 .today-sections {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.today-section-col {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .today-section {
@@ -1790,6 +1826,11 @@ input::placeholder, textarea::placeholder {
 
   .today-card {
     padding: 20px 16px;
+  }
+
+  .today-sections {
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .today-header {

@@ -410,6 +410,7 @@ class TaskApp {
     this.todayFilter = 'all';
     this.todayViewDate = this.todayStr();
     this.todayCalendarMonth = new Date();
+    this.todayCalendarCollapsed = localStorage.getItem('yueyue-today-cal-collapsed') === '1';
     this.aiEvaluationOpen = false;
     this.calendarMode = 'month';
     this.layoutMode = this.getLayoutMode();
@@ -1308,19 +1309,31 @@ class TaskApp {
 
   renderTodayCalendar() {
     const container = document.getElementById('today-calendar');
-    if (!container) return;
+    const body = document.getElementById('today-cal-body');
+    const title = document.getElementById('today-cal-title');
+    const toggle = document.getElementById('today-cal-toggle');
+    if (!container || !body) return;
+
     const year = this.todayCalendarMonth.getFullYear();
     const month = this.todayCalendarMonth.getMonth();
+    if (title) title.textContent = `${year}年${month + 1}月`;
+    if (toggle) toggle.textContent = this.todayCalendarCollapsed ? '▸' : '▾';
+    container.classList.toggle('collapsed', this.todayCalendarCollapsed);
+
+    if (this.todayCalendarCollapsed) {
+      body.innerHTML = '';
+      return;
+    }
+
     const firstDay = new Date(year, month, 1);
     const start = new Date(firstDay);
     start.setDate(start.getDate() - firstDay.getDay());
     const today = this.todayStr();
     const selected = this.todayViewDate;
 
-    let html = `<div class="today-cal-header">
-      <button class="today-cal-nav" onclick="app.changeTodayCalendarMonth(-1)">‹</button>
-      <span class="today-cal-month">${year}年${month + 1}月</span>
-      <button class="today-cal-nav" onclick="app.changeTodayCalendarMonth(1)">›</button>
+    let html = `<div class="today-cal-nav-row">
+      <button class="today-cal-nav" onclick="event.stopPropagation(); app.changeTodayCalendarMonth(-1)">‹</button>
+      <button class="today-cal-nav" onclick="event.stopPropagation(); app.changeTodayCalendarMonth(1)">›</button>
     </div>
     <div class="today-cal-grid">
       <div class="today-cal-week">日</div><div class="today-cal-week">一</div><div class="today-cal-week">二</div><div class="today-cal-week">三</div><div class="today-cal-week">四</div><div class="today-cal-week">五</div><div class="today-cal-week">六</div>`;
@@ -1343,7 +1356,13 @@ class TaskApp {
       </div>`;
     }
     html += '</div>';
-    container.innerHTML = html;
+    body.innerHTML = html;
+  }
+
+  toggleTodayCalendar() {
+    this.todayCalendarCollapsed = !this.todayCalendarCollapsed;
+    localStorage.setItem('yueyue-today-cal-collapsed', this.todayCalendarCollapsed ? '1' : '0');
+    this.renderTodayCalendar();
   }
 
   changeTodayCalendarMonth(delta) {

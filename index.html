@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
   <title>悦悦回国任务台</title>
-  <link rel="stylesheet" href="style.css?v=41">
+  <link rel="stylesheet" href="style.css?v=42">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐿️%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -177,7 +177,13 @@
           </div>
         </div>
 
-        <div class="today-calendar" id="today-calendar"></div>
+        <div class="today-calendar" id="today-calendar">
+          <div class="today-cal-header" onclick="app.toggleTodayCalendar()">
+            <span class="today-cal-month" id="today-cal-title">2026年8月</span>
+            <span class="today-cal-toggle" id="today-cal-toggle">▾</span>
+          </div>
+          <div class="today-cal-body" id="today-cal-body"></div>
+        </div>
 
         <div class="today-ai-box" id="today-ai-box">
           <div class="today-ai-header" onclick="app.toggleAiEvaluation()">
@@ -205,7 +211,7 @@
         </div>
 
         <div class="today-sections">
-          <div class="today-section">
+          <div class="today-section today-section-main">
             <div class="today-section-title">
               <span>🔥 每日必做</span>
               <span class="today-section-count" id="routine-count">0</span>
@@ -213,20 +219,22 @@
             <div class="today-list" id="today-routines"></div>
           </div>
 
-          <div class="today-section">
-            <div class="today-section-title">
-              <span>🌟 今日限定</span>
-              <span class="today-section-count" id="today-todo-count">0</span>
+          <div class="today-section-col">
+            <div class="today-section">
+              <div class="today-section-title">
+                <span>🌟 今日限定</span>
+                <span class="today-section-count" id="today-todo-count">0</span>
+              </div>
+              <div class="today-list" id="today-limited"></div>
             </div>
-            <div class="today-list" id="today-limited"></div>
-          </div>
 
-          <div class="today-section">
-            <div class="today-section-title">
-              <span>📌 今日子任务</span>
-              <span class="today-section-count" id="subtask-count">0</span>
+            <div class="today-section">
+              <div class="today-section-title">
+                <span>📌 今日子任务</span>
+                <span class="today-section-count" id="subtask-count">0</span>
+              </div>
+              <div class="today-list" id="today-subtasks"></div>
             </div>
-            <div class="today-list" id="today-subtasks"></div>
           </div>
         </div>
 
@@ -715,6 +723,6 @@
 
   <script src="supabase.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.4/dist/dom-to-image-more.min.js"></script>
-  <script src="app.js?v=41"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>
