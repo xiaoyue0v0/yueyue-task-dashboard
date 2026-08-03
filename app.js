@@ -404,6 +404,7 @@ class TaskApp {
     this.workspaceSearchQuery = '';
     this.workspaceFilters = JSON.parse(localStorage.getItem('yueyue-ws-filters') || '{}');
     this.sidebarCollapsed = localStorage.getItem('yueyue-ws-sidebar') === '1';
+    this.detailCollapsed = localStorage.getItem('yueyue-ws-detail-collapsed') === '1';
     this.expandedWorkspaceTaskId = null;
     this.filterPopoverOpen = false;
     this.todayFilter = 'all';
@@ -677,10 +678,14 @@ class TaskApp {
   }
 
   renderWorkspaceDetail() {
+    const detail = document.getElementById('workspace-detail');
     const header = document.getElementById('workspace-detail-header');
     const focus = document.getElementById('workspace-detail-focus');
     const tasks = document.getElementById('workspace-detail-tasks');
-    if (!header || !focus || !tasks) return;
+    if (!detail || !header || !focus || !tasks) return;
+
+    // 同步收起状态（避免 localStorage 与 DOM 不一致）
+    detail.classList.toggle('collapsed', this.detailCollapsed);
 
     const cat = this.selectedCategoryId;
     const allCatTasks = this.tasks.filter(t => t.category === cat);
@@ -699,7 +704,7 @@ class TaskApp {
           </div>
         </div>
         <div class="detail-actions">
-          <button title="折叠面板" onclick="app.toggleDetailPanel()">▾</button>
+          <button title="${detail.classList.contains('collapsed') ? '展开面板' : '折叠面板'}" onclick="app.toggleDetailPanel()">${detail.classList.contains('collapsed') ? '▸' : '▾'}</button>
           <button title="编辑分类" onclick="app.editCategory()">✎</button>
           <button title="更多" onclick="app.openCategoryMenu()">⋮</button>
         </div>
@@ -990,8 +995,21 @@ class TaskApp {
     if (window.innerWidth <= 1024) {
       detail.classList.remove('open');
     } else {
-      detail.style.display = detail.style.display === 'none' ? 'flex' : 'none';
+      const willCollapse = !detail.classList.contains('collapsed');
+      detail.classList.toggle('collapsed');
+      this.detailCollapsed = willCollapse;
+      localStorage.setItem('yueyue-ws-detail-collapsed', willCollapse ? '1' : '0');
+      this.renderWorkspaceDetail();
     }
+  }
+
+  expandDetailPanel() {
+    const detail = document.getElementById('workspace-detail');
+    if (!detail) return;
+    detail.classList.remove('collapsed');
+    this.detailCollapsed = false;
+    localStorage.setItem('yueyue-ws-detail-collapsed', '0');
+    this.renderWorkspaceDetail();
   }
 
   goToTodayCalendar() {

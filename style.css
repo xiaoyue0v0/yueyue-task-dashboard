@@ -3799,6 +3799,51 @@ input::placeholder, textarea::placeholder {
   flex-direction: column;
   max-height: calc(100vh - 180px);
   overflow: hidden;
+  min-width: 0;
+  transition: width 0.25s ease, min-width 0.25s ease, opacity 0.2s ease;
+}
+
+/* 右侧面板收起状态：变成窄条 + 展开按钮 */
+.workspace-detail.collapsed {
+  width: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px;
+  cursor: pointer;
+  position: relative;
+}
+
+.workspace-detail.collapsed > *:not(.detail-expand-handle) {
+  display: none !important;
+}
+
+.detail-expand-handle {
+  display: none;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--ws-primary);
+  color: #fff;
+  font-size: 16px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  box-shadow: 0 2px 8px rgba(99,102,241,0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  border: none;
+}
+
+.detail-expand-handle:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 4px 12px rgba(99,102,241,0.45);
+}
+
+.workspace-detail.collapsed .detail-expand-handle {
+  display: flex;
 }
 
 .detail-header {
