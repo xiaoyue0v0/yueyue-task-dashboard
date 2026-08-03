@@ -8,11 +8,12 @@
 
 ## 功能 Features
 
-- **多视图切换**
-  - 今日待办：`每日必做`（打卡习惯）+ `今日限定`（当天专属待办）+ `子任务`
-  - 💩 拉粑粑日历：按月记录，带连续天数 / 最佳纪录统计
-  - 🧴 护肤日历：面膜 / 擦护肤品 / 去美容店 三类行为，可点日期编辑
-  - 🧾 小票托盘：收藏每天生成的「每日小票」，卡片可拖动排序
+- **四视图导航（顶部标签 + 移动端底部导航栏）**
+  - ✅ **今日**：`每日必做`（打卡习惯）+ `今日限定`（当天专属待办）+ `子任务`；AI 评估今日负荷
+  - 📋 **计划**：三栏工作台——左侧任务分类导航 / 中间月历周历主视图 / 右侧当前分类任务详情；支持搜索、筛选、拖拽改期、点击日期建任务
+  - 📒 **记录**：固定日程 + 护肤 / 拉粑粑两张功能卡入口（合并原独立视图，减少一级入口）
+  - 🧾 **小票**：收藏每天生成的「每日小票」，卡片可拖动排序
+- **悬浮便签纸**：右下角一键打开/收起，所有工作台之上，内容自动存本地
 - **每日小票生成器（Daily Receipt）**
   - 复古热敏小票视觉：`DAILY RECEIPT` / `Daily Receipt MM-DD` / 大日期块
   - 每天根据日期随机生成一幅 **像素风 dither 图**（Canvas + Bayer 抖动，8 种图案）
@@ -58,16 +59,11 @@ python3 -m http.server 8000
 
 > 例：Netlify 拖拽部署 → 选 `task-dashboard` 文件夹 → Deploy。
 
-### ⚠️ 网易云「今日歌曲」必须走 Git 部署
+### ⚠️ 网易云「今日歌曲」需要无服务器函数
 
-网易云接口有加密（weapi）+ 浏览器跨域限制，纯前端抓不了，所以该功能依赖仓库里的 `netlify/functions/` 无服务器函数。**Netlify 拖拽部署（Drop）不支持函数**，必须改成把 GitHub 仓库连到 Netlify：
+网易云接口有加密（weapi）+ 浏览器跨域限制，纯前端抓不了，所以该功能依赖一个无服务器函数代理（`ncm.js` / `ncm-cover.js`）。`app.js` 会自动按当前部署域名探测可用的函数地址，无需手动配置。
 
-1. 打开 https://app.netlify.com → **Add new site → Import an existing project → GitHub**
-2. 选 `xiaoyue0v0/yueyue-task-dashboard`
-3. Build command 留空，Publish directory 填 `.`（仓库根 `netlify.toml` 已配好 `functions` 目录）
-4. Deploy 后，🎵 填 UID 即可生效
-
-> 不连 Git、只用 Drop 部署时，其余功能一切正常，「今日歌曲」区块会自动隐藏（无 UID / 无函数时不显示）。
+> 不连函数时，其余功能一切正常，「今日歌曲」区块会自动隐藏（无 UID / 无函数时不显示）。
 
 ---
 
@@ -87,7 +83,7 @@ python3 -m http.server 8000
   # 或撤销某一次改动：
   git revert <commit>     # 生成一个新的反向 commit
   ```
-- 当前仓库基线为 `v15`，此后每次「做一个版本」都会单独提交并打 tag，便于随时回退。
+- 当前仓库基线为 `v41`，此后每次「做一个版本」都会单独提交并打 tag，便于随时回退。
 
 ---
 
@@ -101,7 +97,7 @@ python3 -m http.server 8000
 | `supabase.umd.js` | Supabase 客户端（可选同步） |
 | `DEPLOY.md` | 部署说明 |
 | `SUPABASE_SETUP.md` | 云端同步建表与配置说明 |
-| `netlify.toml` | Netlify 配置（发布目录 + 函数目录） |
+| `netlify.toml` | 历史遗留的 Netlify 配置（函数已迁至 Vercel，见下） |
 | `netlify/functions/ncm.js` | 网易云「我喜欢的音乐」代理（转发到 NeteaseCloudMusicApi 后端） |
 | `netlify/functions/ncm-cover.js` | 网易云封面图 CORS 代理（供 Canvas 像素化） |
 | `preview-*.png` | 各功能界面历史预览截图 |
@@ -113,15 +109,20 @@ python3 -m http.server 8000
 - 数据默认只存你本地浏览器（`localStorage`），不经过任何第三方。
 - 开启云端同步后，数据会经过**你自己的** Supabase 项目，密钥由你掌控。
 - 网易云 **UID 只存在你本地浏览器**（`yueyue-ncm-uid`），不会进仓库。
-- 「今日歌曲」由你自己的 Netlify 函数 `ncm.js` 去抓网易云公开数据。函数默认把请求**转发到一个公开的 NeteaseCloudMusicApi 实例**（与开源 CloudMusicAnalyst 同款后端）。如果你想要完全自控，可以在 Netlify 控制台设置环境变量 `NCM_API_BASE` 指向**你自己部署**的 NeteaseCloudMusicApi（Render / Vercel / 自己的服务器均可），这样数据不经过任何第三方。
+- 「今日歌曲」由部署在 Vercel 的无服务器函数 `ncm.js`（`ncm-api-bice.vercel.app`）去抓网易云公开数据。函数默认把请求**转发到一个公开的 NeteaseCloudMusicApi 实例**（与开源 CloudMusicAnalyst 同款后端）。`app.js` 会自动按当前域名探测可用的函数地址；如果你想要完全自控，可指向**你自己部署**的 NeteaseCloudMusicApi（Render / Vercel / 自己的服务器均可），这样数据不经过任何第三方。
 - 不要把含真实任务数据的导出文件（`*.export.json`）提交进仓库。
 
 ---
 
-## 已修复的历史 Bug（基线 v15 已含）
+## 已修复的历史 Bug（基线 v15 → v41）
 
 - 🧾 小票无法退出 → 加了 × 按钮 / 点背景关闭 / ESC 关闭
 - 💩 拉粑粑刷新后消失 → 云端 pull 不再用陈旧数据覆盖本地未同步的修改（`_dirty` 守卫）
+- 📱 移动端导出小票 PNG 空白 → 改为截取**真实可见**的 `.receipt-paper`（不再用离屏克隆），并移除祖先元素的 `perspective`/`transform`，加空白自检 + 系统字体重试
+- 🧾 导出小票合计行文字被截断 → 提高 CSS 选择器优先级 + 导出时强制 `max-width:none` + `style.css` 加 `?v` 缓存破坏
+- 📝 悬浮便签关闭按钮被吞 → 标题栏 `pointerdown` 里对 `.sticky-close` 提前 return，避免 `preventDefault` 吃掉 click
+- 📱 移动端底部导航栏不显示 → 桌面隐藏规则 `.bottom-nav{display:none}` 必须写在媒体查询**之前**（同特异性后写胜出）
+- 📋 计划视图右侧详情面板收起后打不开 → 旧逻辑用 `display:none` 把整个面板（含折叠按钮）一起藏了；改为 CSS `.collapsed` 类，收起后留 44px 窄条 + 紫色展开按钮（▸），点窄条或按钮均可恢复，状态存 `localStorage`
 
 ---
 
