@@ -423,6 +423,7 @@ class TaskApp {
     this.skincareMonth = new Date();
     this.skincareSelectedDate = null;
     this.dragData = null;
+    this.returnDateStr = localStorage.getItem('yueyue-return-date') || '2026-08-24';
     this.init();
   }
 
@@ -456,7 +457,66 @@ class TaskApp {
       }
     });
     this.initStickyNote();
+    this.initCountdown();
     this.autoConnect();
+  }
+
+  // ===== 回城倒数日 =====
+  initCountdown() {
+    this.renderCountdown();
+    // 每分钟刷新一次（跨天自动更新）
+    if (this._countdownTimer) clearInterval(this._countdownTimer);
+    this._countdownTimer = setInterval(() => this.renderCountdown(), 60 * 1000);
+  }
+
+  renderCountdown() {
+    const el = document.getElementById('countdown-banner');
+    if (!el) return;
+    const target = new Date(this.returnDateStr + 'T00:00:00');
+    const now = new Date();
+    const ms = target.getTime() - now.getTime();
+    const days = Math.ceil(ms / (1000 * 60 * 60 * 24));
+
+    const dateEl = document.getElementById('countdown-date');
+    const numEl = document.getElementById('countdown-days');
+    const unitEl = document.getElementById('countdown-unit');
+    const textEl = document.getElementById('countdown-text');
+    if (!numEl) return;
+
+    if (dateEl) {
+      const m = target.getMonth() + 1;
+      const d = target.getDate();
+      dateEl.textContent = `${m}.${d}`;
+    }
+
+    if (days > 0) {
+      numEl.textContent = days;
+      unitEl.textContent = '天';
+      textEl.textContent = '距回城';
+      el.classList.remove('past');
+    } else if (days === 0) {
+      numEl.textContent = '今天';
+      unitEl.textContent = '';
+      textEl.textContent = '回城日';
+      el.classList.remove('past');
+    } else {
+      numEl.textContent = Math.abs(days);
+      unitEl.textContent = '天前';
+      textEl.textContent = '已回城';
+      el.classList.add('past');
+    }
+  }
+
+  changeReturnDate() {
+    const input = prompt('设置回城日期（格式 YYYY-MM-DD）：', this.returnDateStr);
+    if (!input) return;
+    const m = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(input.trim());
+    if (!m) { alert('格式不对，请用 YYYY-MM-DD'); return; }
+    const d = new Date(`${m[1]}-${m[2]}-${m[3]}T00:00:00`);
+    if (isNaN(d.getTime())) { alert('日期无效'); return; }
+    this.returnDateStr = `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+    localStorage.setItem('yueyue-return-date', this.returnDateStr);
+    this.renderCountdown();
   }
 
   // ===== 悬浮便签纸 =====

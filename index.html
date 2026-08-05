@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
   <title>悦悦回国任务台</title>
-  <link rel="stylesheet" href="style.css?v=50">
+  <link rel="stylesheet" href="style.css?v=51">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐿️%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -35,6 +35,14 @@
         <button class="btn btn-primary" onclick="app.openTaskModal()">+ 新增任务</button>
       </div>
     </header>
+
+    <div class="countdown-banner" id="countdown-banner" onclick="app.changeReturnDate()" title="点击修改回城日期">
+      <span class="countdown-icon">✈️</span>
+      <span class="countdown-text" id="countdown-text">距回城</span>
+      <span class="countdown-date" id="countdown-date">8.24</span>
+      <span class="countdown-num" id="countdown-days">--</span>
+      <span class="countdown-unit" id="countdown-unit">天</span>
+    </div>
 
     <section class="stats">
       <div class="stat-card">
@@ -723,6 +731,6 @@
 
   <script src="supabase.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.4/dist/dom-to-image-more.min.js"></script>
-  <script src="app.js?v=50"></script>
+  <script src="app.js?v=51"></script>
 </body>
 </html>
