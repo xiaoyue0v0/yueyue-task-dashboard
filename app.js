@@ -1231,6 +1231,8 @@ class TaskApp {
       }
 
       const daySubtasks = this.getSubtasksByDate(dateStr);
+      // 未完成的排前面，这样格子顶部直接看到待办
+      daySubtasks.sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
       const visibleItems = daySubtasks.slice(0, 3);
       const moreCount = daySubtasks.length - visibleItems.length;
 
@@ -1279,6 +1281,8 @@ class TaskApp {
       const dateStr = this.dateToStr(date);
       const isToday = dateStr === this.todayStr();
       const daySubtasks = this.getSubtasksByDate(dateStr);
+      // 未完成的排前面
+      daySubtasks.sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0));
 
       html += `
         <div class="week-day ${isToday ? 'today' : ''}"
@@ -3306,6 +3310,8 @@ class TaskApp {
         if (!grouped[sub.taskId]) grouped[sub.taskId] = { title: sub.taskTitle, items: [] };
         grouped[sub.taskId].items.push(sub);
       });
+      // 每组内未完成的排前面
+      Object.values(grouped).forEach(g => g.items.sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0)));
 
       container.innerHTML = Object.entries(grouped).map(([taskId, group]) => `
         <div class="day-subtask-group">
