@@ -3882,7 +3882,8 @@ class TaskApp {
     this.saveData();
 
     if (this.selectedDate) {
-      this.openDayModal(this.selectedDate);
+      this.closeDayModal();
+      this.renderCalendar();
     }
   }
 
