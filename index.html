@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
   <title>悦悦回国任务台</title>
-  <link rel="stylesheet" href="style.css?v=52">
+  <link rel="stylesheet" href="style.css?v=53">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐿️%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -215,6 +215,7 @@
             <button class="filter-btn" id="today-filter-undone" onclick="app.setTodayFilter('undone')">仅看未完成</button>
           </div>
           <button class="btn btn-small btn-danger" onclick="app.clearCompletedToday()">清除已完成</button>
+          <button class="btn btn-small" onclick="app.deferToTomorrow()" title="将未完成的今日限定和子任务顺延到明天">⏭ 顺延</button>
           <button class="btn btn-small" onclick="app.openReceipt()">🧾 今日小票</button>
         </div>
 
@@ -731,6 +732,6 @@
 
   <script src="supabase.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.4/dist/dom-to-image-more.min.js"></script>
-  <script src="app.js?v=52"></script>
+  <script src="app.js?v=53"></script>
 </body>
 </html>

@@ -1729,6 +1729,59 @@ class TaskApp {
       if (idx >= 0) r.dates.splice(idx, 1);
     });
     this.saveData();
+    this.renderTodayView();
+    this.updateStats();
+  }
+
+  // ===== 顺延：未完成项转到明天 =====
+  deferToTomorrow() {
+    const today = this.todayViewDate;
+    // 计算明天的日期字符串
+    const d = new Date(today);
+    d.setDate(d.getDate() + 1);
+    const tomorrow = this.dateToStr(d);
+
+    // 1. 今日限定（todayTodos）：未完成的改日期到明天
+    const deferredTodos = this.todayTodos.filter(t => t.date === today && t.status !== 'done');
+    deferredTodos.forEach(t => { t.date = tomorrow; });
+
+    // 2. 今日子任务：未完成的改日期到明天
+    const todaySubtasks = this.getSubtasksByDate(today);
+    const deferredSubs = todaySubtasks.filter(s => s.status !== 'done');
+    deferredSubs.forEach(s => {
+      const task = this.tasks.find(t => t.id === s.taskId);
+      if (task) {
+        const sub = task.subtasks.find(sub => sub.id === s.id);
+        if (sub) sub.date = tomorrow;
+      }
+    });
+
+    const total = deferredTodos.length + deferredSubs.length;
+    if (total === 0) {
+      alert('今天没有未完成的事项可以顺延');
+      return;
+    }
+
+    this.saveData();
+
+    // 刷新所有相关视图
+    this.renderTodayView();
+    this.updateStats();
+    this.renderScheduleCalendar();
+    this.renderWorkspaceDetail();
+
+    // 自动跳到明天查看
+    this.setTodayViewDate(tomorrow);
+
+    const parts = [];
+    if (deferredTodos.length > 0) parts.push(`${deferredTodos.length} 个今日限定`);
+    if (deferredSubs.length > 0) parts.push(`${deferredSubs.length} 个子任务`);
+    // 轻量提示，不用 alert 阻塞
+    const toast = document.createElement('div');
+    toast.textContent = `✅ 已顺延 ${parts.join('、')} 到 ${tomorrow}`;
+    toast.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:10px 20px;border-radius:10px;font-size:14px;z-index:9999;box-shadow:0 4px 16px rgba(0,0,0,.25);animation:fadeInUp .3s ease';
+    document.body.appendChild(toast);
+    setTimeout(() => { toast.style.opacity='0'; toast.style.transition='opacity .3s'; setTimeout(() => toast.remove(), 300); }, 2000);
   }
 
   // ===== 每日小票 =====
