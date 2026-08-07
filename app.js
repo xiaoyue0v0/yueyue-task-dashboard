@@ -3124,6 +3124,39 @@ class TaskApp {
     }
   }
 
+  handleSlotDragOver(event) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    event.currentTarget.classList.add('drag-over');
+  }
+
+  handleSlotDragLeave(event) {
+    event.currentTarget.classList.remove('drag-over');
+  }
+
+  handleSlotDrop(event) {
+    event.preventDefault();
+    const slotEl = event.currentTarget;
+    slotEl.classList.remove('drag-over');
+    if (!this.dragData) return;
+    const slot = slotEl.dataset.slot;
+    const { taskId, subtaskId } = this.dragData;
+    this.moveSubtaskToSlot(taskId, subtaskId, slot);
+  }
+
+  moveSubtaskToSlot(taskId, subtaskId, slot) {
+    const task = this.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const sub = task.subtasks.find(s => s.id === subtaskId);
+    if (!sub) return;
+    sub.slot = slot;
+    this.saveData();
+    this.schedulePush();
+    if (this.selectedDate) {
+      this.openDayModal(this.selectedDate);
+    }
+  }
+
   // Helpers
   todayStr() {
     const d = new Date();
@@ -3448,38 +3481,78 @@ class TaskApp {
     if (subs.length === 0) {
       container.innerHTML = '<div class="day-empty">这一天还没有安排事项<br>点击下方添加</div>';
     } else {
-      const grouped = {};
-      subs.forEach(sub => {
-        if (!grouped[sub.taskId]) grouped[sub.taskId] = { title: sub.taskTitle, items: [] };
-        grouped[sub.taskId].items.push(sub);
-      });
-      // 每组内未完成的排前面
-      Object.values(grouped).forEach(g => g.items.sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0)));
+      const slots = [
+        { key: 'morning', label: '🌅 上午' },
+        { key: 'afternoon', label: '☀️ 下午' },
+        { key: 'evening', label: '🌙 晚上' }
+      ];
 
-      container.innerHTML = Object.entries(grouped).map(([taskId, group]) => `
-        <div class="day-subtask-group">
-          <h4 class="cat-${group.items[0]?.category || ''}">${this.escapeHtml(group.title)}</h4>
-          ${group.items.map(sub => `
-            <div class="subtask-item cat-${sub.category}"
-                 draggable="true"
-                 ondragstart="app.handleDragStart(event, '${taskId}', '${sub.id}')"
-                 ondragend="app.handleDragEnd(event)">
-              <div class="subtask-checkbox ${sub.status === 'done' ? 'checked' : ''}" onclick="app.toggleSubtask('${taskId}', '${sub.id}')">
-                ${sub.status === 'done' ? '✓' : ''}
+      container.innerHTML = `
+        <div class="day-slots">
+          ${slots.map(slot => {
+            const slotSubs = subs.filter(s => (s.slot || 'morning') === slot.key);
+            return `
+              <div class="day-slot ${slotSubs.length === 0 ? 'empty' : ''}" data-slot="${slot.key}"
+                   ondragover="app.handleSlotDragOver(event)" ondragleave="app.handleSlotDragLeave(event)" ondrop="app.handleSlotDrop(event)">
+                <div class="day-slot-header">
+                  <span class="day-slot-title">${slot.label}</span>
+                  <span class="day-slot-count">${slotSubs.length}</span>
+                </div>
+                <div class="day-slot-body">
+                  ${this.renderDaySlotGroups(slotSubs)}
+                </div>
               </div>
-              <span class="subtask-title ${sub.status === 'done' ? 'done' : ''}">${this.escapeHtml(sub.title)}</span>
-              <div class="subtask-actions">
-                <button class="icon-btn" title="编辑" onclick="app.openSubtaskModal('${taskId}', '${sub.id}')">✏️</button>
-                <button class="icon-btn" title="删除" onclick="app.deleteSubtask('${taskId}', '${sub.id}')">🗑️</button>
-              </div>
-            </div>
-          `).join('')}
+            `;
+          }).join('')}
         </div>
-      `).join('');
+      `;
     }
 
     document.getElementById('day-add-btn').onclick = () => this.openSubtaskModal(null, null, dateStr);
     modal.style.display = 'flex';
+  }
+
+  renderDaySlotGroups(subs) {
+    if (subs.length === 0) {
+      return '<div class="day-slot-empty">暂无安排</div>';
+    }
+    const grouped = {};
+    subs.forEach(sub => {
+      if (!grouped[sub.taskId]) grouped[sub.taskId] = { title: sub.taskTitle, items: [] };
+      grouped[sub.taskId].items.push(sub);
+    });
+    // 每组内未完成的排前面
+    Object.values(grouped).forEach(g => g.items.sort((a, b) => (a.status === 'done' ? 1 : 0) - (b.status === 'done' ? 1 : 0)));
+
+    return Object.entries(grouped).map(([taskId, group]) => `
+      <div class="day-subtask-group">
+        <h4 class="cat-${group.items[0]?.category || ''}">${this.escapeHtml(group.title)}</h4>
+        ${group.items.map(sub => {
+          const slot = sub.slot || 'morning';
+          return `
+            <div class="subtask-item cat-${sub.category}"
+                 draggable="true"
+                 ondragstart="app.handleDragStart(event, '${taskId}', '${sub.id}')"
+                 ondragend="app.handleDragEnd(event)">
+              <span class="drag-handle" onclick="event.stopPropagation()">⋮⋮</span>
+              <div class="subtask-checkbox ${sub.status === 'done' ? 'checked' : ''}" onclick="app.toggleSubtask('${taskId}', '${sub.id}')">
+                ${sub.status === 'done' ? '✓' : ''}
+              </div>
+              <span class="subtask-title ${sub.status === 'done' ? 'done' : ''}">${this.escapeHtml(sub.title)}</span>
+              <div class="slot-picker" onclick="event.stopPropagation()">
+                <button class="slot-pill ${slot === 'morning' ? 'active' : ''}" onclick="event.stopPropagation(); app.moveSubtaskToSlot('${taskId}', '${sub.id}', 'morning')">上</button>
+                <button class="slot-pill ${slot === 'afternoon' ? 'active' : ''}" onclick="event.stopPropagation(); app.moveSubtaskToSlot('${taskId}', '${sub.id}', 'afternoon')">下</button>
+                <button class="slot-pill ${slot === 'evening' ? 'active' : ''}" onclick="event.stopPropagation(); app.moveSubtaskToSlot('${taskId}', '${sub.id}', 'evening')">晚</button>
+              </div>
+              <div class="subtask-actions" onclick="event.stopPropagation()">
+                <button class="icon-btn" title="编辑" onclick="app.openSubtaskModal('${taskId}', '${sub.id}')">✏️</button>
+                <button class="icon-btn" title="删除" onclick="app.deleteSubtask('${taskId}', '${sub.id}')">🗑️</button>
+              </div>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    `).join('');
   }
 
   closeDayModal() {
@@ -4375,7 +4448,7 @@ class TaskApp {
       }
     } else {
       const task = this.tasks.find(t => t.id === newTaskId);
-      task.subtasks.push({ id: 's' + Date.now(), title, status, date });
+      task.subtasks.push({ id: 's' + Date.now(), title, status, date, slot: 'morning' });
       this.updateTaskStatusFromSubtasks(task);
     }
 

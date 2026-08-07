@@ -1051,6 +1051,100 @@ input::placeholder, textarea::placeholder {
 .day-subtask-group h4.cat-购物消费 { color: #9d174d; border-color: #fce7f3; background: transparent; }
 .day-subtask-group h4.cat-生活护理 { color: #92400e; border-color: #fef3c7; background: transparent; }
 
+.day-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.day-slot {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  transition: background 0.2s, border-color 0.2s, box-shadow 0.2s;
+  min-height: 80px;
+}
+
+.day-slot.empty {
+  background: transparent;
+}
+
+.day-slot.drag-over {
+  border-color: var(--primary);
+  background: #eef2ff;
+  box-shadow: inset 0 0 0 2px var(--primary);
+}
+
+.day-slot-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.day-slot-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.day-slot-count {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--card);
+  padding: 2px 8px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+}
+
+.day-slot-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  padding: 8px 0;
+  text-align: center;
+}
+
+.slot-picker {
+  display: flex;
+  gap: 3px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.subtask-item:hover .slot-picker {
+  opacity: 1;
+}
+
+.slot-pill {
+  font-size: 11px;
+  padding: 2px 6px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  line-height: 1.2;
+}
+
+.slot-pill:hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.slot-pill.active {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+
+@media (max-width: 768px) {
+  .slot-picker {
+    opacity: 1;
+  }
+}
+
 .day-empty {
   text-align: center;
   color: var(--text-secondary);
