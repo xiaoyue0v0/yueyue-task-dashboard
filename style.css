@@ -1718,7 +1718,34 @@ input::placeholder, textarea::placeholder {
 .today-item-title {
   font-size: 14px;
   font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.today-item-note-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px dashed transparent;
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-secondary);
+  padding: 2px 0;
   margin-bottom: 4px;
+  outline: none;
+  cursor: text;
+  transition: border-color 0.2s, color 0.2s;
+}
+
+.today-item-note-input::placeholder {
+  color: #c4c7ce;
+}
+
+.today-item-note-input:focus {
+  border-bottom-color: var(--primary);
+  color: var(--text-primary);
+}
+
+.today-item.done .today-item-note-input {
+  color: #9ca3af;
 }
 
 .today-item-meta {

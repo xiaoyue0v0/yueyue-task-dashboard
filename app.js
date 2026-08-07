@@ -1478,6 +1478,7 @@ class TaskApp {
       title: r.title,
       icon: r.icon,
       done: (r.dates || []).includes(today),
+      note: (r.notes && r.notes[today]) || '',
       data: r
     }));
   }
@@ -1489,6 +1490,7 @@ class TaskApp {
       title: t.title,
       icon: '📝',
       done: t.status === 'done',
+      note: t.notes || '',
       data: t
     }));
   }
@@ -1508,6 +1510,7 @@ class TaskApp {
         <div class="today-item-icon">${item.icon}</div>
         <div class="today-item-content">
           <div class="today-item-title">${this.escapeHtml(item.title)}</div>
+          <input type="text" class="today-item-note-input" placeholder="简单记录一下..." value="${this.escapeHtml(item.note)}" data-original="${this.escapeHtml(item.note)}" onclick="event.stopPropagation()" onkeydown="app.handleNoteKey(event, this)" onblur="app.saveRoutineNote('${item.id}', '${this.todayViewDate}', this.value, this)">
           <div class="today-item-meta">
             <span class="today-item-tag today-tag-type">ROUTINE</span>
           </div>
@@ -1534,6 +1537,7 @@ class TaskApp {
         <div class="today-item-icon">${item.icon}</div>
         <div class="today-item-content">
           <div class="today-item-title">${this.escapeHtml(item.title)}</div>
+          <input type="text" class="today-item-note-input" placeholder="简单记录一下..." value="${this.escapeHtml(item.note)}" data-original="${this.escapeHtml(item.note)}" onclick="event.stopPropagation()" onkeydown="app.handleNoteKey(event, this)" onblur="app.saveTodayTodoNote('${item.id}', this.value, this)">
           <div class="today-item-meta">
             <span class="today-item-tag today-tag-today">TODAY</span>
           </div>
@@ -1562,6 +1566,7 @@ class TaskApp {
         </div>
         <div class="today-item-content">
           <div class="today-item-title">${this.escapeHtml(s.title)}</div>
+          <input type="text" class="today-item-note-input" placeholder="简单记录一下..." value="${this.escapeHtml(s.notes || '')}" data-original="${this.escapeHtml(s.notes || '')}" onclick="event.stopPropagation()" onkeydown="app.handleNoteKey(event, this)" onblur="app.saveSubtaskNote('${s.taskId}', '${s.id}', this.value, this)">
           <div class="today-item-meta">
             <span class="today-item-tag today-tag-parent ${catClass}">${this.escapeHtml(s.taskTitle)}</span>
           </div>
@@ -1573,6 +1578,60 @@ class TaskApp {
       </div>
       `;
     }).join('');
+  }
+
+  handleNoteKey(event, input) {
+    if (event.key === 'Enter') {
+      input.blur();
+    } else if (event.key === 'Escape') {
+      input.value = input.dataset.original || '';
+      input.blur();
+    }
+  }
+
+  saveRoutineNote(routineId, date, value, input) {
+    const routine = this.routines.find(r => r.id === routineId);
+    if (!routine) return;
+    const clean = (value || '').trim();
+    if (!routine.notes) routine.notes = {};
+    if (clean) {
+      routine.notes[date] = clean;
+    } else {
+      delete routine.notes[date];
+    }
+    input.dataset.original = clean;
+    this.saveData();
+    this.schedulePush();
+  }
+
+  saveTodayTodoNote(todoId, value, input) {
+    const todo = this.todayTodos.find(t => t.id === todoId);
+    if (!todo) return;
+    const clean = (value || '').trim();
+    if (clean) {
+      todo.notes = clean;
+    } else {
+      delete todo.notes;
+    }
+    input.dataset.original = clean;
+    this.saveData();
+    this.schedulePush();
+  }
+
+  saveSubtaskNote(taskId, subtaskId, value, input) {
+    const task = this.tasks.find(t => t.id === taskId);
+    if (!task) return;
+    const sub = task.subtasks.find(s => s.id === subtaskId);
+    if (!sub) return;
+    const clean = (value || '').trim();
+    if (clean) {
+      sub.notes = clean;
+    } else {
+      delete sub.notes;
+    }
+    input.dataset.original = clean;
+    this.saveData();
+    this.schedulePush();
   }
 
   updateTodayProgress(routineItems, limitedItems, subtasks) {
