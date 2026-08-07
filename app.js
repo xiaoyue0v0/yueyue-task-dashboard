@@ -1582,19 +1582,23 @@ class TaskApp {
 
   renderNoteField(type, id, note, subId) {
     const hasNote = !!(note || '').trim();
-    const displayClass = hasNote ? 'today-item-note-display' : 'today-item-note-display note-placeholder';
-    const displayText = hasNote ? this.escapeHtml(note) : '简单记录一下...';
     const subArg = subId ? `, '${subId}'` : '';
+    if (hasNote) {
+      return `
+      <div class="today-item-note" onclick="event.stopPropagation()">
+        <div class="today-item-note-display" onclick="app.startNoteEdit(this, '${type}', '${id}'${subArg})">${this.escapeHtml(note)}</div>
+      </div>`;
+    }
     return `
       <div class="today-item-note" onclick="event.stopPropagation()">
-        <div class="${displayClass}" onclick="app.startNoteEdit(this, '${type}', '${id}'${subArg})">${displayText}</div>
-      </div>
-    `;
+        <button type="button" class="today-item-note-add" title="添加记录" onclick="app.startNoteEdit(this, '${type}', '${id}'${subArg})">📝</button>
+      </div>`;
   }
 
-  startNoteEdit(displayEl, type, id, subId) {
-    const container = displayEl.parentElement;
-    const note = displayEl.classList.contains('note-placeholder') ? '' : displayEl.textContent;
+  startNoteEdit(triggerEl, type, id, subId) {
+    const container = triggerEl.closest('.today-item-note');
+    const isAdd = triggerEl.classList.contains('today-item-note-add');
+    const note = isAdd ? '' : triggerEl.textContent;
     const subArg = subId ? `, '${subId}'` : '';
     container.innerHTML = `<input type="text" class="today-item-note-input" placeholder="简单记录一下..." value="${this.escapeHtml(note)}" onclick="event.stopPropagation()" onkeydown="app.handleNoteKey(event, this)" onblur="app.saveNoteFromInput(this, '${type}', '${id}'${subArg})" autofocus>`;
     const input = container.querySelector('input');
