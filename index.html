@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
   <title>悦悦回国任务台</title>
-  <link rel="stylesheet" href="style.css?v=53">
+  <link rel="stylesheet" href="style.css?v=54">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐿️%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -277,6 +277,16 @@
             <span class="record-card-title">拉粑粑</span>
             <span class="record-card-sub" id="record-card-poop-sub">记录每日打卡</span>
           </button>
+          <button class="record-card record-card-drink" onclick="app.openRecordModule('drink')">
+            <span class="record-card-icon">🥤</span>
+            <span class="record-card-title">饮品</span>
+            <span class="record-card-sub" id="record-card-drink-sub">记录今天喝的</span>
+          </button>
+          <button class="record-card record-card-food" onclick="app.openRecordModule('food')">
+            <span class="record-card-icon">🍱</span>
+            <span class="record-card-title">食物</span>
+            <span class="record-card-sub" id="record-card-food-sub">记录一日三餐</span>
+          </button>
         </div>
       </div>
 
@@ -351,6 +361,70 @@
         <div class="calendar-grid poop-calendar-grid" id="poop-calendar-grid"></div>
         <div class="poop-today-action">
           <button class="btn btn-primary" onclick="app.togglePoop(app.todayStr())">💩 记录今天</button>
+        </div>
+      </div>
+
+      <!-- 饮品模块 -->
+      <div id="record-drink" style="display:none;">
+        <div class="record-module-back">
+          <button class="today-nav-btn" onclick="app.openRecordHub()">‹</button>
+          <span class="record-module-title">🥤 饮品</span>
+        </div>
+        <div class="drink-stats">
+          <div class="drink-stat-card">
+            <div class="drink-stat-num" id="drink-total">0</div>
+            <div class="drink-stat-label">累计记录天数</div>
+          </div>
+          <div class="drink-stat-card">
+            <div class="drink-stat-num" id="drink-month">0</div>
+            <div class="drink-stat-label">本月杯数</div>
+          </div>
+          <div class="drink-stat-card">
+            <div class="drink-stat-num" id="drink-brands">0</div>
+            <div class="drink-stat-label">打卡品牌数</div>
+          </div>
+        </div>
+        <p class="drink-tip">点日历里的日期，记录当天喝的饮品（品牌 + 具体名称，可多次添加）。今天还没记的话，点下方按钮快速记录～</p>
+        <div class="calendar-header drink-calendar-header">
+          <button class="icon-btn" onclick="app.changeDrinkMonth(-1)">‹</button>
+          <h2 id="drink-month-title">2026年8月</h2>
+          <button class="icon-btn" onclick="app.changeDrinkMonth(1)">›</button>
+        </div>
+        <div class="calendar-grid drink-calendar-grid" id="drink-calendar-grid"></div>
+        <div class="drink-today-action">
+          <button class="btn btn-primary" onclick="app.openDrinkDay(app.todayStr())">🥤 记录今天喝的</button>
+        </div>
+      </div>
+
+      <!-- 食物模块 -->
+      <div id="record-food" style="display:none;">
+        <div class="record-module-back">
+          <button class="today-nav-btn" onclick="app.openRecordHub()">‹</button>
+          <span class="record-module-title">🍱 食物</span>
+        </div>
+        <div class="food-stats">
+          <div class="food-stat-card">
+            <div class="food-stat-num" id="food-total">0</div>
+            <div class="food-stat-label">累计记录天数</div>
+          </div>
+          <div class="food-stat-card">
+            <div class="food-stat-num" id="food-month">0</div>
+            <div class="food-stat-label">本月餐数</div>
+          </div>
+          <div class="food-stat-card">
+            <div class="food-stat-num" id="food-meals">0</div>
+            <div class="food-stat-label">总记录餐数</div>
+          </div>
+        </div>
+        <p class="food-tip">点日历里的日期，记录当天的一日三餐（早 / 午 / 晚，每餐可添加多道菜）。今天还没记的话，点下方按钮快速记录～</p>
+        <div class="calendar-header food-calendar-header">
+          <button class="icon-btn" onclick="app.changeFoodMonth(-1)">‹</button>
+          <h2 id="food-month-title">2026年8月</h2>
+          <button class="icon-btn" onclick="app.changeFoodMonth(1)">›</button>
+        </div>
+        <div class="calendar-grid food-calendar-grid" id="food-calendar-grid"></div>
+        <div class="food-today-action">
+          <button class="btn btn-primary" onclick="app.openFoodDay(app.todayStr())">🍱 记录今天三餐</button>
         </div>
       </div>
     </section>
@@ -656,6 +730,28 @@
     </div>
   </div>
 
+  <!-- Drink Day Modal -->
+  <div class="modal-overlay" id="drink-day-modal" style="display: none;">
+    <div class="modal drink-day-modal">
+      <div class="modal-header">
+        <h2 id="drink-day-title">饮品记录</h2>
+        <button class="modal-close" onclick="app.closeDrinkDayModal()">×</button>
+      </div>
+      <div class="modal-body" id="drink-day-body"></div>
+    </div>
+  </div>
+
+  <!-- Food Day Modal -->
+  <div class="modal-overlay" id="food-day-modal" style="display: none;">
+    <div class="modal food-day-modal">
+      <div class="modal-header">
+        <h2 id="food-day-title">食物记录</h2>
+        <button class="modal-close" onclick="app.closeFoodDayModal()">×</button>
+      </div>
+      <div class="modal-body" id="food-day-body"></div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="receipt-modal" style="display: none;">
     <div class="receipt-sheet" onclick="if(event.target===this) app.closeReceipt()">
       <div class="receipt-printer"><div class="receipt-printer-slot"></div><div class="receipt-printer-light"></div></div>
@@ -732,6 +828,6 @@
 
   <script src="supabase.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.4/dist/dom-to-image-more.min.js"></script>
-  <script src="app.js?v=53"></script>
+  <script src="app.js?v=54"></script>
 </body>
 </html>

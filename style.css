@@ -4428,3 +4428,243 @@ body.plan-active .app {
   padding: 0;
   padding-bottom: max(16px, env(safe-area-inset-bottom));
 }
+
+/* =========================================================
+   饮品 / 食物 日历
+   ========================================================= */
+.record-card-drink {
+  background: linear-gradient(145deg, #e7f5ff, #d0ebff);
+}
+.record-card-food {
+  background: linear-gradient(145deg, #fff4e6, #ffe8cc);
+}
+
+/* 统计卡片 */
+.drink-stats,
+.food-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-top: 16px;
+}
+.drink-stat-card,
+.food-stat-card {
+  background: var(--ws-panel-bg);
+  border: 1px solid var(--ws-border);
+  border-radius: 14px;
+  padding: 16px 12px;
+  text-align: center;
+}
+.drink-stat-num,
+.food-stat-num {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+.drink-stat-label,
+.food-stat-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.drink-tip,
+.food-tip {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 14px 0 6px;
+}
+
+/* 日历格子标记 */
+.drink-day {
+  background: linear-gradient(135deg, #e7f5ff, #f3f0ff);
+  border-color: #74c0fc;
+}
+.drink-day:hover {
+  border-color: #74c0fc !important;
+  background: linear-gradient(135deg, #d0ebff, #e5dbff) !important;
+}
+.drink-day.today {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, #eef2ff, #e7f5ff);
+}
+.drink-day .calendar-day-number {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.drink-badge {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+  justify-content: center;
+}
+.drink-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+.drink-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1c7ed6;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0 5px;
+  min-width: 16px;
+  text-align: center;
+}
+.drink-future {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.food-day {
+  background: linear-gradient(135deg, #fff4e6, #fff0f6);
+  border-color: #ffa94d;
+}
+.food-day:hover {
+  border-color: #ffa94d !important;
+  background: linear-gradient(135deg, #ffe8cc, #ffe3ee) !important;
+}
+.food-day.today {
+  border-color: var(--primary);
+  background: linear-gradient(135deg, #eef2ff, #fff4e6);
+}
+.food-day .calendar-day-number {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+.food-badge {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+  justify-content: center;
+}
+.food-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+.food-count {
+  font-size: 11px;
+  font-weight: 700;
+  color: #e8590c;
+  background: #fff;
+  border-radius: 8px;
+  padding: 0 5px;
+  min-width: 16px;
+  text-align: center;
+}
+.food-future {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.drink-today-action,
+.food-today-action {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+/* 日期明细弹窗 */
+.drink-day-modal,
+.food-day-modal {
+  max-width: 380px;
+}
+.drink-list,
+.food-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.drink-empty,
+.food-empty {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin: 0;
+}
+.drink-row,
+.food-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--ws-panel-bg);
+  border: 1px solid var(--ws-border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.drink-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.drink-brand {
+  font-size: 12px;
+  color: #1c7ed6;
+  font-weight: 600;
+}
+.drink-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+.drink-del,
+.food-del {
+  flex-shrink: 0;
+  border: none;
+  background: rgba(0,0,0,0.05);
+  color: var(--text-secondary);
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+.drink-del:hover,
+.food-del:hover {
+  background: #ff6b6b;
+  color: #fff;
+}
+.drink-add,
+.food-add {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.drink-input,
+.food-input {
+  flex: 1 1 120px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--ws-border);
+  border-radius: 10px;
+  font-size: 14px;
+  outline: none;
+}
+.drink-input:focus,
+.food-input:focus {
+  border-color: var(--primary);
+}
+
+/* 食物：三餐分块 */
+.food-meal-block {
+  margin-bottom: 16px;
+}
+.food-meal-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+.food-item {
+  font-size: 14px;
+  color: var(--text-primary);
+  word-break: break-word;
+}

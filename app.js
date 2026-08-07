@@ -383,6 +383,8 @@ class TaskApp {
     this.todayTodos = data.todayTodos || [];
     this.poopDates = data.poopDates || [];
     this.skincareDates = data.skincareDates || {};
+    this.drinkDates = data.drinkDates || {};   // { 'YYYY-MM-DD': [ { brand, name }, ... ] }
+    this.mealDates = data.mealDates || {};      // { 'YYYY-MM-DD': { breakfast:[], lunch:[], dinner:[] } }
     this.receipts = data.receipts || [];
     this.syncCode = localStorage.getItem(SYNC_CODE_KEY) || '';
     this.lastRemoteUpdatedAt = localStorage.getItem(SYNC_REMOTE_KEY) || '';
@@ -422,6 +424,10 @@ class TaskApp {
     this.poopMonth = new Date();
     this.skincareMonth = new Date();
     this.skincareSelectedDate = null;
+    this.drinkMonth = new Date();
+    this.foodMonth = new Date();
+    this.drinkSelectedDate = null;
+    this.foodSelectedDate = null;
     this.dragData = null;
     this.returnDateStr = localStorage.getItem('yueyue-return-date') || '2026-08-24';
     this.init();
@@ -608,6 +614,8 @@ class TaskApp {
           todayTodos: data.todayTodos || [],
           poopDates: data.poopDates || [],
           skincareDates: data.skincareDates || {},
+          drinkDates: data.drinkDates || {},
+          mealDates: data.mealDates || {},
           receipts: data.receipts || []
         };
       }
@@ -619,7 +627,7 @@ class TaskApp {
 
   persistLocal() {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks: this.tasks, routines: this.routines, todayTodos: this.todayTodos, poopDates: this.poopDates, skincareDates: this.skincareDates, receipts: this.receipts }));
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({ tasks: this.tasks, routines: this.routines, todayTodos: this.todayTodos, poopDates: this.poopDates, skincareDates: this.skincareDates, drinkDates: this.drinkDates, mealDates: this.mealDates, receipts: this.receipts }));
     } catch (e) {
       console.error('Failed to save data', e);
     }
@@ -1099,9 +1107,13 @@ class TaskApp {
     const hub = document.getElementById('record-hub');
     const sk = document.getElementById('record-skincare');
     const po = document.getElementById('record-poop');
+    const dr = document.getElementById('record-drink');
+    const fo = document.getElementById('record-food');
     if (hub) hub.style.display = this.recordSub === 'hub' ? 'block' : 'none';
     if (sk) sk.style.display = this.recordSub === 'skincare' ? 'block' : 'none';
     if (po) po.style.display = this.recordSub === 'poop' ? 'block' : 'none';
+    if (dr) dr.style.display = this.recordSub === 'drink' ? 'block' : 'none';
+    if (fo) fo.style.display = this.recordSub === 'food' ? 'block' : 'none';
     this.updateRecordCardStats();
     if (this.recordSub === 'hub') {
       this.renderRoutines();
@@ -1110,6 +1122,10 @@ class TaskApp {
       this.renderSkincareView();
     } else if (this.recordSub === 'poop') {
       this.renderPoopView();
+    } else if (this.recordSub === 'drink') {
+      this.renderDrinkView();
+    } else if (this.recordSub === 'food') {
+      this.renderFoodView();
     }
   }
 
@@ -1149,6 +1165,21 @@ class TaskApp {
         cursor = this.shiftDate(cursor, -1);
       }
       poSub.textContent = streak > 0 ? `已连续 ${streak} 天` : '记录每日打卡';
+    }
+    // 饮品：今天已记杯数
+    const drSub = document.getElementById('record-card-drink-sub');
+    if (drSub) {
+      const today = this.todayStr();
+      const drinks = this.drinkDates[today] || [];
+      drSub.textContent = drinks.length > 0 ? `今天已记 ${drinks.length} 杯` : '记录今天喝的';
+    }
+    // 食物：今天已记餐数
+    const foSub = document.getElementById('record-card-food-sub');
+    if (foSub) {
+      const today = this.todayStr();
+      const fm = this.mealDates[today];
+      const cnt = fm ? this.mealCountOf(today) : 0;
+      foSub.textContent = cnt > 0 ? `今天已记 ${cnt} 餐` : '记录一日三餐';
     }
   }
 
@@ -3845,6 +3876,298 @@ class TaskApp {
     this.toggleSkincareCategory(today, cat);
   }
 
+  // ===== 饮品日历 =====
+  renderDrinkView() {
+    this.renderDrinkStats();
+    this.renderDrinkCalendar();
+  }
+
+  changeDrinkMonth(delta) {
+    this.drinkMonth.setMonth(this.drinkMonth.getMonth() + delta);
+    this.drinkMonth = new Date(this.drinkMonth);
+    this.renderDrinkCalendar();
+  }
+
+  renderDrinkCalendar() {
+    const container = document.getElementById('drink-calendar-grid');
+    if (!container) return;
+    const year = this.drinkMonth.getFullYear();
+    const month = this.drinkMonth.getMonth();
+    document.getElementById('drink-month-title').textContent = `${year}年${month + 1}月`;
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startOffset = firstDay.getDay();
+    const daysInMonth = lastDay.getDate();
+    const prevLastDay = new Date(year, month, 0).getDate();
+    const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+    const today = this.todayStr();
+
+    let html = WEEKDAY_NAMES.map(d => `<div class="calendar-weekday">周${d}</div>`).join('');
+
+    for (let i = 0; i < totalCells; i++) {
+      const dayIndex = i - startOffset + 1;
+      let dateStr, displayDay, otherMonth = false;
+
+      if (dayIndex <= 0) {
+        displayDay = prevLastDay + dayIndex;
+        const prevMonth = new Date(year, month, 0);
+        dateStr = this.formatDate(prevMonth.getFullYear(), prevMonth.getMonth(), displayDay);
+        otherMonth = true;
+      } else if (dayIndex > daysInMonth) {
+        displayDay = dayIndex - daysInMonth;
+        const nextMonth = new Date(year, month + 1, 1);
+        dateStr = this.formatDate(nextMonth.getFullYear(), nextMonth.getMonth(), displayDay);
+        otherMonth = true;
+      } else {
+        displayDay = dayIndex;
+        dateStr = this.formatDate(year, month, dayIndex);
+      }
+
+      const isToday = dateStr === today;
+      const isFuture = dateStr > today;
+      const drinks = this.drinkDates[dateStr] || [];
+      const count = drinks.length;
+
+      const classes = ['calendar-day'];
+      if (otherMonth) classes.push('other-month');
+      if (isToday) classes.push('today');
+      if (count) classes.push('drink-day');
+
+      const badge = count ? `<div class="drink-badge"><span class="drink-emoji">🥤</span><span class="drink-count">${count}</span></div>` : '';
+
+      html += `
+        <div class="${classes.join(' ')} ${isFuture ? 'drink-future' : ''}" onclick="app.openDrinkDay('${dateStr}')">
+          <div class="calendar-day-number">${displayDay}</div>
+          ${badge}
+        </div>
+      `;
+    }
+    container.innerHTML = html;
+  }
+
+  openDrinkDay(dateStr) {
+    const today = this.todayStr();
+    if (dateStr > today) return; // 不允许记录未来
+    this.drinkSelectedDate = dateStr;
+    const arr = this.drinkDates[dateStr] || [];
+    document.getElementById('drink-day-title').textContent = `${dateStr} 的饮品`;
+    const body = document.getElementById('drink-day-body');
+    const rows = arr.length === 0
+      ? '<p class="drink-empty">今天还没记录饮品～</p>'
+      : arr.map((d, i) => `
+        <div class="drink-row">
+          <div class="drink-info">
+            <span class="drink-brand">${this.escapeHtml(d.brand || '未填品牌')}</span>
+            <span class="drink-name">${this.escapeHtml(d.name)}</span>
+          </div>
+          <button class="drink-del" onclick="app.removeDrink('${dateStr}', ${i})" aria-label="删除">✕</button>
+        </div>`).join('');
+    body.innerHTML = `
+      <div class="drink-list">${rows}</div>
+      <div class="drink-add">
+        <input type="text" id="drink-brand-input" class="drink-input" placeholder="品牌（如 瑞幸）" />
+        <input type="text" id="drink-name-input" class="drink-input" placeholder="具体名称（如 生椰拿铁）" onkeydown="if(event.key==='Enter') app.addDrink('${dateStr}')" />
+        <button type="button" class="btn btn-primary btn-small" onclick="app.addDrink('${dateStr}')">+ 添加</button>
+      </div>
+    `;
+    document.getElementById('drink-day-modal').style.display = 'flex';
+  }
+
+  addDrink(dateStr) {
+    const brand = (document.getElementById('drink-brand-input')?.value || '').trim();
+    const name = (document.getElementById('drink-name-input')?.value || '').trim();
+    if (!name) { alert('请填写具体名称'); return; }
+    if (!this.drinkDates[dateStr]) this.drinkDates[dateStr] = [];
+    this.drinkDates[dateStr].push({ brand, name });
+    this.saveData();
+    this.openDrinkDay(dateStr);
+  }
+
+  removeDrink(dateStr, index) {
+    if (!this.drinkDates[dateStr]) return;
+    this.drinkDates[dateStr].splice(index, 1);
+    if (this.drinkDates[dateStr].length === 0) delete this.drinkDates[dateStr];
+    this.saveData();
+    this.openDrinkDay(dateStr);
+  }
+
+  closeDrinkDayModal() {
+    document.getElementById('drink-day-modal').style.display = 'none';
+    this.drinkSelectedDate = null;
+  }
+
+  renderDrinkStats() {
+    const y = this.drinkMonth.getFullYear();
+    const m = this.drinkMonth.getMonth();
+    const dates = Object.keys(this.drinkDates);
+    const total = dates.length;
+    let monthCount = 0;
+    const brands = new Set();
+    dates.forEach(d => {
+      const p = d.split('-').map(Number);
+      const arr = this.drinkDates[d];
+      monthCount += (p[0] === y && p[1] - 1 === m) ? arr.length : 0;
+      arr.forEach(x => { if (x.brand) brands.add(x.brand); });
+    });
+    const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setText('drink-total', total);
+    setText('drink-month', monthCount);
+    setText('drink-brands', brands.size);
+  }
+
+  // ===== 食物日历 =====
+  renderFoodView() {
+    this.renderFoodStats();
+    this.renderFoodCalendar();
+  }
+
+  changeFoodMonth(delta) {
+    this.foodMonth.setMonth(this.foodMonth.getMonth() + delta);
+    this.foodMonth = new Date(this.foodMonth);
+    this.renderFoodCalendar();
+  }
+
+  mealCountOf(dateStr) {
+    const m = this.mealDates[dateStr];
+    if (!m) return 0;
+    return (m.breakfast?.length || 0) + (m.lunch?.length || 0) + (m.dinner?.length || 0);
+  }
+
+  renderFoodCalendar() {
+    const container = document.getElementById('food-calendar-grid');
+    if (!container) return;
+    const year = this.foodMonth.getFullYear();
+    const month = this.foodMonth.getMonth();
+    document.getElementById('food-month-title').textContent = `${year}年${month + 1}月`;
+
+    const firstDay = new Date(year, month, 1);
+    const lastDay = new Date(year, month + 1, 0);
+    const startOffset = firstDay.getDay();
+    const daysInMonth = lastDay.getDate();
+    const prevLastDay = new Date(year, month, 0).getDate();
+    const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+    const today = this.todayStr();
+
+    let html = WEEKDAY_NAMES.map(d => `<div class="calendar-weekday">周${d}</div>`).join('');
+
+    for (let i = 0; i < totalCells; i++) {
+      const dayIndex = i - startOffset + 1;
+      let dateStr, displayDay, otherMonth = false;
+
+      if (dayIndex <= 0) {
+        displayDay = prevLastDay + dayIndex;
+        const prevMonth = new Date(year, month, 0);
+        dateStr = this.formatDate(prevMonth.getFullYear(), prevMonth.getMonth(), displayDay);
+        otherMonth = true;
+      } else if (dayIndex > daysInMonth) {
+        displayDay = dayIndex - daysInMonth;
+        const nextMonth = new Date(year, month + 1, 1);
+        dateStr = this.formatDate(nextMonth.getFullYear(), nextMonth.getMonth(), displayDay);
+        otherMonth = true;
+      } else {
+        displayDay = dayIndex;
+        dateStr = this.formatDate(year, month, dayIndex);
+      }
+
+      const isToday = dateStr === today;
+      const isFuture = dateStr > today;
+      const count = this.mealCountOf(dateStr);
+
+      const classes = ['calendar-day'];
+      if (otherMonth) classes.push('other-month');
+      if (isToday) classes.push('today');
+      if (count) classes.push('food-day');
+
+      const badge = count ? `<div class="food-badge"><span class="food-emoji">🍱</span><span class="food-count">${count}</span></div>` : '';
+
+      html += `
+        <div class="${classes.join(' ')} ${isFuture ? 'food-future' : ''}" onclick="app.openFoodDay('${dateStr}')">
+          <div class="calendar-day-number">${displayDay}</div>
+          ${badge}
+        </div>
+      `;
+    }
+    container.innerHTML = html;
+  }
+
+  openFoodDay(dateStr) {
+    const today = this.todayStr();
+    if (dateStr > today) return; // 不允许记录未来
+    this.foodSelectedDate = dateStr;
+    const meals = this.mealDates[dateStr] || { breakfast: [], lunch: [], dinner: [] };
+    document.getElementById('food-day-title').textContent = `${dateStr} 的食物`;
+    const types = [
+      ['breakfast', '🌅 早餐', '早餐'],
+      ['lunch', '☀️ 午餐', '午餐'],
+      ['dinner', '🌙 晚餐', '晚餐']
+    ];
+    const body = document.getElementById('food-day-body');
+    body.innerHTML = types.map(([key, label, short]) => {
+      const items = meals[key] || [];
+      const list = items.length === 0
+        ? '<p class="food-empty">还没记</p>'
+        : items.map((it, i) => `
+          <div class="food-row">
+            <span class="food-item">${this.escapeHtml(it)}</span>
+            <button class="food-del" onclick="app.removeMeal('${dateStr}', '${key}', ${i})" aria-label="删除">✕</button>
+          </div>`).join('');
+      return `
+        <div class="food-meal-block">
+          <div class="food-meal-title">${label}</div>
+          <div class="food-list">${list}</div>
+          <div class="food-add">
+            <input type="text" class="food-input" id="food-input-${key}" placeholder="添加${short}..." onkeydown="if(event.key==='Enter') app.addMeal('${dateStr}', '${key}')" />
+            <button type="button" class="btn btn-primary btn-small" onclick="app.addMeal('${dateStr}', '${key}')">添加</button>
+          </div>
+        </div>`;
+    }).join('');
+    document.getElementById('food-day-modal').style.display = 'flex';
+  }
+
+  addMeal(dateStr, mealType) {
+    const input = document.getElementById(`food-input-${mealType}`);
+    const val = (input?.value || '').trim();
+    if (!val) { alert('请填写菜品'); return; }
+    if (!this.mealDates[dateStr]) this.mealDates[dateStr] = { breakfast: [], lunch: [], dinner: [] };
+    if (!this.mealDates[dateStr][mealType]) this.mealDates[dateStr][mealType] = [];
+    this.mealDates[dateStr][mealType].push(val);
+    this.saveData();
+    this.openFoodDay(dateStr);
+  }
+
+  removeMeal(dateStr, mealType, index) {
+    const m = this.mealDates[dateStr];
+    if (!m || !m[mealType]) return;
+    m[mealType].splice(index, 1);
+    if (m.breakfast.length === 0 && m.lunch.length === 0 && m.dinner.length === 0) delete this.mealDates[dateStr];
+    this.saveData();
+    this.openFoodDay(dateStr);
+  }
+
+  closeFoodDayModal() {
+    document.getElementById('food-day-modal').style.display = 'none';
+    this.foodSelectedDate = null;
+  }
+
+  renderFoodStats() {
+    const y = this.foodMonth.getFullYear();
+    const m = this.foodMonth.getMonth();
+    const dates = Object.keys(this.mealDates);
+    const total = dates.length;
+    let monthCount = 0, totalCount = 0;
+    dates.forEach(d => {
+      const p = d.split('-').map(Number);
+      const c = this.mealCountOf(d);
+      totalCount += c;
+      if (p[0] === y && p[1] - 1 === m) monthCount += c;
+    });
+    const setText = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    setText('food-total', total);
+    setText('food-month', monthCount);
+    setText('food-meals', totalCount);
+  }
+
   // Task Modal
   openTaskModal(taskId = null, defaultCategory = null) {
     const modal = document.getElementById('task-modal');
@@ -4039,7 +4362,7 @@ class TaskApp {
 
   // Import / Export
   exportData() {
-    const dataStr = JSON.stringify({ tasks: this.tasks, routines: this.routines, todayTodos: this.todayTodos, poopDates: this.poopDates, skincareDates: this.skincareDates, receipts: this.receipts }, null, 2);
+    const dataStr = JSON.stringify({ tasks: this.tasks, routines: this.routines, todayTodos: this.todayTodos, poopDates: this.poopDates, skincareDates: this.skincareDates, drinkDates: this.drinkDates, mealDates: this.mealDates, receipts: this.receipts }, null, 2);
     const blob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -4068,6 +4391,8 @@ class TaskApp {
           this.todayTodos = data.todayTodos || [];
           this.poopDates = data.poopDates || [];
           this.skincareDates = data.skincareDates || {};
+          this.drinkDates = data.drinkDates || {};
+          this.mealDates = data.mealDates || {};
           this.receipts = data.receipts || [];
         }
         this.saveData();
@@ -4211,7 +4536,7 @@ class TaskApp {
     const updatedAt = new Date().toISOString();
     const payload = {
       code: this.syncCode,
-      data: { tasks: this.tasks, routines: this.routines, todayTodos: this.todayTodos, poopDates: this.poopDates, skincareDates: this.skincareDates, receipts: this.receipts },
+      data: { tasks: this.tasks, routines: this.routines, todayTodos: this.todayTodos, poopDates: this.poopDates, skincareDates: this.skincareDates, drinkDates: this.drinkDates, mealDates: this.mealDates, receipts: this.receipts },
       updated_at: updatedAt
     };
     const { error } = await client.from('sync').upsert(payload);
@@ -4246,6 +4571,8 @@ class TaskApp {
     this.todayTodos = d.todayTodos || [];
     this.poopDates = d.poopDates || [];
     this.skincareDates = d.skincareDates || {};
+    this.drinkDates = d.drinkDates || {};
+    this.mealDates = d.mealDates || {};
     this.receipts = d.receipts || [];
     this.persistLocal();
     this.renderView();
