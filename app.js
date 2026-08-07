@@ -1510,7 +1510,7 @@ class TaskApp {
         <div class="today-item-icon">${item.icon}</div>
         <div class="today-item-content">
           <div class="today-item-title">${this.escapeHtml(item.title)}</div>
-          <input type="text" class="today-item-note-input" placeholder="简单记录一下..." value="${this.escapeHtml(item.note)}" data-original="${this.escapeHtml(item.note)}" onclick="event.stopPropagation()" onkeydown="app.handleNoteKey(event, this)" onblur="app.saveRoutineNote('${item.id}', '${this.todayViewDate}', this.value, this)">
+          ${this.renderNoteField('routine', item.id, item.note)}
           <div class="today-item-meta">
             <span class="today-item-tag today-tag-type">ROUTINE</span>
           </div>
@@ -1537,7 +1537,7 @@ class TaskApp {
         <div class="today-item-icon">${item.icon}</div>
         <div class="today-item-content">
           <div class="today-item-title">${this.escapeHtml(item.title)}</div>
-          <input type="text" class="today-item-note-input" placeholder="简单记录一下..." value="${this.escapeHtml(item.note)}" data-original="${this.escapeHtml(item.note)}" onclick="event.stopPropagation()" onkeydown="app.handleNoteKey(event, this)" onblur="app.saveTodayTodoNote('${item.id}', this.value, this)">
+          ${this.renderNoteField('todo', item.id, item.note)}
           <div class="today-item-meta">
             <span class="today-item-tag today-tag-today">TODAY</span>
           </div>
@@ -1566,7 +1566,7 @@ class TaskApp {
         </div>
         <div class="today-item-content">
           <div class="today-item-title">${this.escapeHtml(s.title)}</div>
-          <input type="text" class="today-item-note-input" placeholder="简单记录一下..." value="${this.escapeHtml(s.notes || '')}" data-original="${this.escapeHtml(s.notes || '')}" onclick="event.stopPropagation()" onkeydown="app.handleNoteKey(event, this)" onblur="app.saveSubtaskNote('${s.taskId}', '${s.id}', this.value, this)">
+          ${this.renderNoteField('subtask', s.id, s.notes || '', s.taskId)}
           <div class="today-item-meta">
             <span class="today-item-tag today-tag-parent ${catClass}">${this.escapeHtml(s.taskTitle)}</span>
           </div>
@@ -1580,12 +1580,44 @@ class TaskApp {
     }).join('');
   }
 
+  renderNoteField(type, id, note, subId) {
+    const hasNote = !!(note || '').trim();
+    const displayClass = hasNote ? 'today-item-note-display' : 'today-item-note-display note-placeholder';
+    const displayText = hasNote ? this.escapeHtml(note) : '简单记录一下...';
+    const subArg = subId ? `, '${subId}'` : '';
+    return `
+      <div class="today-item-note" onclick="event.stopPropagation()">
+        <div class="${displayClass}" onclick="app.startNoteEdit(this, '${type}', '${id}'${subArg})">${displayText}</div>
+      </div>
+    `;
+  }
+
+  startNoteEdit(displayEl, type, id, subId) {
+    const container = displayEl.parentElement;
+    const note = displayEl.classList.contains('note-placeholder') ? '' : displayEl.textContent;
+    const subArg = subId ? `, '${subId}'` : '';
+    container.innerHTML = `<input type="text" class="today-item-note-input" placeholder="简单记录一下..." value="${this.escapeHtml(note)}" onclick="event.stopPropagation()" onkeydown="app.handleNoteKey(event, this)" onblur="app.saveNoteFromInput(this, '${type}', '${id}'${subArg})" autofocus>`;
+    const input = container.querySelector('input');
+    requestAnimationFrame(() => input.focus());
+  }
+
+  saveNoteFromInput(input, type, id, subId) {
+    const value = input.value;
+    if (type === 'routine') {
+      this.saveRoutineNote(id, this.todayViewDate, value);
+    } else if (type === 'todo') {
+      this.saveTodayTodoNote(id, value);
+    } else if (type === 'subtask') {
+      this.saveSubtaskNote(subId, id, value);
+    }
+    this.renderTodayView();
+  }
+
   handleNoteKey(event, input) {
     if (event.key === 'Enter') {
       input.blur();
     } else if (event.key === 'Escape') {
-      input.value = input.dataset.original || '';
-      input.blur();
+      this.renderTodayView();
     }
   }
 
@@ -1599,7 +1631,7 @@ class TaskApp {
     } else {
       delete routine.notes[date];
     }
-    input.dataset.original = clean;
+    if (input && input.dataset) input.dataset.original = clean;
     this.saveData();
     this.schedulePush();
   }
@@ -1613,7 +1645,7 @@ class TaskApp {
     } else {
       delete todo.notes;
     }
-    input.dataset.original = clean;
+    if (input && input.dataset) input.dataset.original = clean;
     this.saveData();
     this.schedulePush();
   }
@@ -1629,7 +1661,7 @@ class TaskApp {
     } else {
       delete sub.notes;
     }
-    input.dataset.original = clean;
+    if (input && input.dataset) input.dataset.original = clean;
     this.saveData();
     this.schedulePush();
   }

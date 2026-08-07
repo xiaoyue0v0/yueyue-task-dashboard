@@ -1815,15 +1815,41 @@ input::placeholder, textarea::placeholder {
   margin-bottom: 2px;
 }
 
-.today-item-note-input {
-  width: 100%;
-  border: none;
-  border-bottom: 1px dashed transparent;
-  background: transparent;
+.today-item-note {
+  min-height: 20px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.today-item-note-display {
   font-size: 12px;
   color: var(--text-secondary);
   padding: 2px 0;
-  margin-bottom: 4px;
+  cursor: text;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.today-item-note-display:hover {
+  color: var(--primary);
+}
+
+.today-item-note-display.note-placeholder {
+  color: #c4c7ce;
+}
+
+.today-item-note-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px dashed var(--primary);
+  background: transparent;
+  font-size: 12px;
+  color: var(--text-primary);
+  padding: 2px 0;
   outline: none;
   cursor: text;
   transition: border-color 0.2s, color 0.2s;
@@ -1835,11 +1861,14 @@ input::placeholder, textarea::placeholder {
 
 .today-item-note-input:focus {
   border-bottom-color: var(--primary);
-  color: var(--text-primary);
 }
 
-.today-item.done .today-item-note-input {
+.today-item.done .today-item-note-display {
   color: #9ca3af;
+}
+
+.today-item.done .today-item-note-display.note-placeholder {
+  color: #c4c7ce;
 }
 
 .today-item-meta {
