@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
   <title>悦悦回国任务台</title>
-  <link rel="stylesheet" href="style.css?v=56">
+  <link rel="stylesheet" href="style.css?v=57">
   <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🐿️%3C/text%3E%3C/svg%3E">
 </head>
 <body>
@@ -259,12 +259,6 @@
           <button class="btn btn-primary btn-small" onclick="app.openRoutineModal()">+ 新增固定日程</button>
         </div>
         <div class="routines-list" id="routines-list"></div>
-        <div class="calendar-header" style="margin-top: 20px;">
-          <button class="icon-btn" onclick="app.changeHabitMonth(-1)">‹</button>
-          <h2 id="habit-calendar-month-title">2026年7月</h2>
-          <button class="icon-btn" onclick="app.changeHabitMonth(1)">›</button>
-        </div>
-        <div class="calendar-grid habit-calendar-grid" id="habit-calendar-grid"></div>
 
         <div class="record-cards">
           <button class="record-card record-card-skincare" onclick="app.openRecordModule('skincare')">
@@ -288,6 +282,13 @@
             <span class="record-card-sub" id="record-card-food-sub">记录一日三餐</span>
           </button>
         </div>
+
+        <div class="calendar-header" style="margin-top: 20px;">
+          <button class="icon-btn" onclick="app.changeHabitMonth(-1)">‹</button>
+          <h2 id="habit-calendar-month-title">2026年7月</h2>
+          <button class="icon-btn" onclick="app.changeHabitMonth(1)">›</button>
+        </div>
+        <div class="calendar-grid habit-calendar-grid" id="habit-calendar-grid"></div>
       </div>
 
       <!-- 护肤模块 -->
@@ -828,6 +829,6 @@
 
   <script src="supabase.umd.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/dom-to-image-more@3.4.4/dist/dom-to-image-more.min.js"></script>
-  <script src="app.js?v=56"></script>
+  <script src="app.js?v=57"></script>
 </body>
 </html>
